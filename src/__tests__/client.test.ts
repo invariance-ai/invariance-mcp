@@ -237,8 +237,8 @@ describe('InvarianceClient', () => {
 
     await client.createMonitor({
       name: 'Test',
-      description: 'desc',
-      query: 'q',
+      natural_language: 'Alert when traces fail repeatedly',
+      severity: 'high',
     });
 
     expect(mockFetch).toHaveBeenCalledWith(
@@ -251,7 +251,7 @@ describe('InvarianceClient', () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () =>
-        Promise.resolve({ id: 'd1', name: 'Test', itemCount: 0 }),
+        Promise.resolve({ id: 'd1', name: 'Test', row_count: 0 }),
     });
     vi.stubGlobal('fetch', mockFetch);
 
@@ -276,7 +276,7 @@ describe('InvarianceClient', () => {
     expect(calledUrl).toBe('https://api.example.com/v1/monitors/m1');
   });
 
-  it('getEval gets /v1/evals/:id', async () => {
+  it('getEval gets /v1/evals/runs/:id', async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ id: 'e1', name: 'Test' }),
@@ -286,6 +286,6 @@ describe('InvarianceClient', () => {
     await client.getEval('e1');
 
     const calledUrl = mockFetch.mock.calls[0][0] as string;
-    expect(calledUrl).toBe('https://api.example.com/v1/evals/e1');
+    expect(calledUrl).toBe('https://api.example.com/v1/evals/runs/e1');
   });
 });

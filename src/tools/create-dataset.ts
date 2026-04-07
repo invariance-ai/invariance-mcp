@@ -11,11 +11,15 @@ export const createDatasetTool = {
       .string()
       .min(1)
       .describe('Description of the dataset'),
+    agent_id: z
+      .string()
+      .optional()
+      .describe('Optional agent ID to associate with the dataset'),
   }),
 
   async execute(
     client: InvarianceClient,
-    input: { name: string; description: string },
+    input: { name: string; description: string; agent_id?: string },
   ) {
     try {
       const result = await client.createDataset(input);

@@ -6,22 +6,18 @@ export const listDatasetsTool = {
   name: 'list_datasets',
   description: 'List available evaluation datasets',
   inputSchema: z.object({
-    limit: z
-      .number()
-      .int()
-      .min(1)
-      .max(100)
+    agent_id: z
+      .string()
       .optional()
-      .default(20)
-      .describe('Maximum number of datasets to return (1-100, default 20)'),
+      .describe('Filter datasets by agent ID'),
   }),
 
   async execute(
     client: InvarianceClient,
-    input: { limit?: number },
+    input: { agent_id?: string },
   ) {
     try {
-      const result = await client.listDatasets({ limit: input.limit });
+      const result = await client.listDatasets({ agent_id: input.agent_id });
       return {
         content: [
           {

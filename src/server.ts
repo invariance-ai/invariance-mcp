@@ -221,15 +221,10 @@ export function createServer(): McpServer {
     listDatasetsTool.name,
     listDatasetsTool.description,
     {
-      limit: z
-        .number()
-        .int()
-        .min(1)
-        .max(100)
+      agent_id: z
+        .string()
         .optional()
-        .describe(
-          'Maximum number of datasets to return (1-100, default 20)',
-        ),
+        .describe('Filter datasets by agent ID'),
     },
     async (input) => {
       try {
@@ -244,19 +239,22 @@ export function createServer(): McpServer {
     listEvalsTool.name,
     listEvalsTool.description,
     {
-      limit: z
-        .number()
-        .int()
-        .min(1)
-        .max(100)
+      suite_id: z
+        .string()
         .optional()
-        .describe(
-          'Maximum number of evaluations to return (1-100, default 20)',
-        ),
+        .describe('Filter evaluation runs by suite ID'),
+      agent_id: z
+        .string()
+        .optional()
+        .describe('Filter evaluation runs by agent ID'),
+      status: z
+        .string()
+        .optional()
+        .describe('Filter evaluation runs by status'),
       dataset_id: z
         .string()
         .optional()
-        .describe('Filter evaluations by dataset ID'),
+        .describe('Filter evaluation runs by dataset ID'),
     },
     async (input) => {
       try {
@@ -272,22 +270,23 @@ export function createServer(): McpServer {
     createMonitorTool.description,
     {
       name: z.string().min(1).describe('Name for the new monitor'),
-      description: z
+      natural_language: z
         .string()
         .min(1)
-        .describe('Description of what the monitor tracks'),
-      query: z
-        .string()
-        .min(1)
-        .describe('Query expression that defines the monitor logic'),
-      schedule: z
+        .describe('Natural-language rule describing what the monitor should detect'),
+      agent_id: z
         .string()
         .optional()
-        .describe('Cron schedule for the monitor (e.g. "0 * * * *")'),
-      threshold: z
-        .number()
+        .describe('Optional agent ID to scope the monitor'),
+      severity: z
+        .enum(['low', 'medium', 'high', 'critical'])
         .optional()
-        .describe('Numeric threshold for triggering alerts'),
+        .describe('Signal severity when the monitor triggers'),
+      webhook_url: z
+        .string()
+        .url()
+        .optional()
+        .describe('Optional webhook URL to notify when the monitor triggers'),
     },
     async (input) => {
       try {
@@ -307,6 +306,10 @@ export function createServer(): McpServer {
         .string()
         .min(1)
         .describe('Description of the dataset'),
+      agent_id: z
+        .string()
+        .optional()
+        .describe('Optional agent ID to associate with the dataset'),
     },
     async (input) => {
       try {
@@ -436,13 +439,12 @@ export function createServer(): McpServer {
 
 export async function startServer(): Promise<void> {
   const config = loadConfig();
-  const server = createServer();
 
   if (config.transport === 'sse') {
     const { connectHttp } = await import('./transport.js');
-    await connectHttp(server, config.port);
+    await connectHttp(createServer, config.port);
   } else {
     const { connectStdio } = await import('./transport.js');
-    await connectStdio(server);
+    await connectStdio(createServer());
   }
 }

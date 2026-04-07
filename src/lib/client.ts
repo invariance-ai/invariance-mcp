@@ -210,10 +210,10 @@ export class InvarianceClient {
   // ---- Datasets ----
 
   async listDatasets(params: {
-    limit?: number;
-  }): Promise<PaginatedResponse<Dataset>> {
-    return this.get<PaginatedResponse<Dataset>>('/v1/datasets', {
-      limit: params.limit,
+    agent_id?: string;
+  }): Promise<Dataset[]> {
+    return this.get<Dataset[]>('/v1/datasets', {
+      agent_id: params.agent_id,
     });
   }
 
@@ -224,18 +224,22 @@ export class InvarianceClient {
   // ---- Evaluations ----
 
   async listEvals(params: {
-    limit?: number;
+    suite_id?: string;
+    agent_id?: string;
+    status?: string;
     dataset_id?: string;
-  }): Promise<PaginatedResponse<Evaluation>> {
-    return this.get<PaginatedResponse<Evaluation>>('/v1/evals', {
-      limit: params.limit,
+  }): Promise<Evaluation[]> {
+    return this.get<Evaluation[]>('/v1/evals/runs', {
+      suite_id: params.suite_id,
+      agent_id: params.agent_id,
+      status: params.status,
       dataset_id: params.dataset_id,
     });
   }
 
   async getEval(evalId: string): Promise<Evaluation> {
     return this.get<Evaluation>(
-      `/v1/evals/${encodeURIComponent(evalId)}`,
+      `/v1/evals/runs/${encodeURIComponent(evalId)}`,
     );
   }
 }

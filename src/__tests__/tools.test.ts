@@ -94,8 +94,11 @@ describe('tool input schemas', () => {
     expect(result.success).toBe(true);
   });
 
-  it('list_evals accepts dataset_id filter', () => {
+  it('list_evals accepts run filters', () => {
     const result = listEvalsTool.inputSchema.safeParse({
+      suite_id: 'suite_123',
+      agent_id: 'owner/agent',
+      status: 'completed',
       dataset_id: 'ds_123',
     });
     expect(result.success).toBe(true);
@@ -103,7 +106,7 @@ describe('tool input schemas', () => {
 
   // ── New tools ──
 
-  it('create_monitor requires name, description, query', () => {
+  it('create_monitor requires name and natural_language', () => {
     const result = createMonitorTool.inputSchema.safeParse({});
     expect(result.success).toBe(false);
   });
@@ -111,10 +114,10 @@ describe('tool input schemas', () => {
   it('create_monitor accepts valid input with optional fields', () => {
     const result = createMonitorTool.inputSchema.safeParse({
       name: 'Test Monitor',
-      description: 'A test monitor',
-      query: 'status == "error"',
-      schedule: '0 * * * *',
-      threshold: 10,
+      natural_language: 'Alert when traces fail',
+      agent_id: 'owner/agent',
+      severity: 'high',
+      webhook_url: 'https://example.com/webhook',
     });
     expect(result.success).toBe(true);
   });
@@ -122,8 +125,7 @@ describe('tool input schemas', () => {
   it('create_monitor accepts valid input without optional fields', () => {
     const result = createMonitorTool.inputSchema.safeParse({
       name: 'Test Monitor',
-      description: 'A test monitor',
-      query: 'status == "error"',
+      natural_language: 'Alert when traces fail',
     });
     expect(result.success).toBe(true);
   });
@@ -137,6 +139,7 @@ describe('tool input schemas', () => {
     const result = createDatasetTool.inputSchema.safeParse({
       name: 'Test Dataset',
       description: 'A test dataset',
+      agent_id: 'owner/agent',
     });
     expect(result.success).toBe(true);
   });

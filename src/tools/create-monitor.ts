@@ -4,36 +4,36 @@ import { handleToolError } from '../lib/errors.js';
 
 export const createMonitorTool = {
   name: 'create_monitor',
-  description:
-    'Create a new monitor in Invariance to track agent behavior',
+  description: 'Create a new monitor in Invariance from a natural-language rule',
   inputSchema: z.object({
     name: z.string().min(1).describe('Name for the new monitor'),
-    description: z
+    natural_language: z
       .string()
       .min(1)
-      .describe('Description of what the monitor tracks'),
-    query: z
-      .string()
-      .min(1)
-      .describe('Query expression that defines the monitor logic'),
-    schedule: z
+      .describe('Natural-language rule describing what the monitor should detect'),
+    agent_id: z
       .string()
       .optional()
-      .describe('Cron schedule for the monitor (e.g. "0 * * * *")'),
-    threshold: z
-      .number()
+      .describe('Optional agent ID to scope the monitor'),
+    severity: z
+      .enum(['low', 'medium', 'high', 'critical'])
       .optional()
-      .describe('Numeric threshold for triggering alerts'),
+      .describe('Signal severity when the monitor triggers'),
+    webhook_url: z
+      .string()
+      .url()
+      .optional()
+      .describe('Optional webhook URL to notify when the monitor triggers'),
   }),
 
   async execute(
     client: InvarianceClient,
     input: {
       name: string;
-      description: string;
-      query: string;
-      schedule?: string;
-      threshold?: number;
+      natural_language: string;
+      agent_id?: string;
+      severity?: string;
+      webhook_url?: string;
     },
   ) {
     try {

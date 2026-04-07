@@ -4,7 +4,7 @@ import { handleToolError } from '../lib/errors.js';
 
 export const getEvalTool = {
   name: 'get_eval',
-  description: 'Get detailed results of an evaluation run',
+  description: 'Get detailed results of a specific evaluation run',
   inputSchema: z.object({
     eval_id: z
       .string()

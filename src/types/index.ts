@@ -46,11 +46,18 @@ export interface TraceDetail extends Trace {
 export interface Monitor {
   id: string;
   name: string;
-  description?: string;
+  natural_language?: string;
+  compiled_condition?: string | Record<string, unknown> | null;
+  definition?: Record<string, unknown> | null;
+  agent_id?: string | null;
+  severity?: string;
   status: string;
-  type: string;
-  config?: Record<string, unknown>;
-  lastRunAt?: string;
+  webhook_url?: string | null;
+  owner_id?: string;
+  triggers_count?: number;
+  last_triggered?: string | number | null;
+  created_at?: string | number;
+  updated_at?: string;
 }
 
 export interface MonitorRunResult {
@@ -75,32 +82,49 @@ export interface Signal {
 
 export interface Session {
   id: string;
-  agentId?: string;
-  startTime: string;
-  endTime?: string;
+  name: string;
+  created_by: string;
   status: string;
-  traceIds: string[];
-  metadata?: Record<string, unknown>;
+  created_at: string;
+  closed_at?: string | null;
+  root_hash?: string | null;
+  close_hash?: string | null;
+  receipt_count?: number;
 }
 
 export interface Dataset {
   id: string;
   name: string;
-  description?: string;
-  itemCount: number;
-  createdAt: string;
-  updatedAt: string;
+  description: string | null;
+  agent_id: string | null;
+  owner_id: string;
+  current_draft_version: number;
+  latest_published_version: number;
+  row_count: number;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Evaluation {
   id: string;
-  datasetId: string;
-  name: string;
+  suite_id: string;
+  agent_id: string;
+  version_label?: string | null;
   status: string;
-  score?: number;
-  createdAt: string;
-  completedAt?: string;
+  total_cases?: number;
+  passed_cases?: number;
+  failed_cases?: number;
+  pass_rate?: number | null;
+  avg_score?: number | null;
+  duration_ms?: number | null;
   metadata?: Record<string, unknown>;
+  owner_id?: string;
+  started_at: string;
+  completed_at: string | null;
+  created_at?: string;
+  dataset_id?: string | null;
+  source_type?: string;
 }
 
 export interface QueryResult {
@@ -128,16 +152,17 @@ export interface PaginatedResponse<T> {
 
 export interface CreateMonitorInput {
   name: string;
-  description: string;
-  query: string;
-  schedule?: string;
-  threshold?: number;
+  natural_language: string;
+  agent_id?: string;
+  severity?: string;
+  webhook_url?: string;
 }
 
 export interface CreateDatasetInput {
   name: string;
   description: string;
-  items?: unknown[];
+  agent_id?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ApiError {
