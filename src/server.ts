@@ -1,5 +1,4 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 
 import { loadConfig } from './lib/config.js';
@@ -17,6 +16,10 @@ import { getSessionTool } from './tools/get-session.js';
 import { searchDocsTool } from './tools/search-docs.js';
 import { listDatasetsTool } from './tools/list-datasets.js';
 import { listEvalsTool } from './tools/list-evals.js';
+import { createMonitorTool } from './tools/create-monitor.js';
+import { createDatasetTool } from './tools/create-dataset.js';
+import { getMonitorTool } from './tools/get-monitor.js';
+import { getEvalTool } from './tools/get-eval.js';
 
 import { troubleshootingPrompt } from './prompts/troubleshooting.js';
 import { monitorInvestigationPrompt } from './prompts/monitor-investigation.js';
@@ -264,6 +267,92 @@ export function createServer(): McpServer {
     },
   );
 
+  server.tool(
+    createMonitorTool.name,
+    createMonitorTool.description,
+    {
+      name: z.string().min(1).describe('Name for the new monitor'),
+      description: z
+        .string()
+        .min(1)
+        .describe('Description of what the monitor tracks'),
+      query: z
+        .string()
+        .min(1)
+        .describe('Query expression that defines the monitor logic'),
+      schedule: z
+        .string()
+        .optional()
+        .describe('Cron schedule for the monitor (e.g. "0 * * * *")'),
+      threshold: z
+        .number()
+        .optional()
+        .describe('Numeric threshold for triggering alerts'),
+    },
+    async (input) => {
+      try {
+        return await createMonitorTool.execute(client, input);
+      } catch (error) {
+        handleToolError(error);
+      }
+    },
+  );
+
+  server.tool(
+    createDatasetTool.name,
+    createDatasetTool.description,
+    {
+      name: z.string().min(1).describe('Name for the new dataset'),
+      description: z
+        .string()
+        .min(1)
+        .describe('Description of the dataset'),
+    },
+    async (input) => {
+      try {
+        return await createDatasetTool.execute(client, input);
+      } catch (error) {
+        handleToolError(error);
+      }
+    },
+  );
+
+  server.tool(
+    getMonitorTool.name,
+    getMonitorTool.description,
+    {
+      monitor_id: z
+        .string()
+        .min(1)
+        .describe('The ID of the monitor to retrieve'),
+    },
+    async (input) => {
+      try {
+        return await getMonitorTool.execute(client, input);
+      } catch (error) {
+        handleToolError(error);
+      }
+    },
+  );
+
+  server.tool(
+    getEvalTool.name,
+    getEvalTool.description,
+    {
+      eval_id: z
+        .string()
+        .min(1)
+        .describe('The ID of the evaluation to retrieve'),
+    },
+    async (input) => {
+      try {
+        return await getEvalTool.execute(client, input);
+      } catch (error) {
+        handleToolError(error);
+      }
+    },
+  );
+
   // ── Prompts ────────────────────────────────────────────────────────
 
   server.prompt(
@@ -346,7 +435,14 @@ export function createServer(): McpServer {
 }
 
 export async function startServer(): Promise<void> {
+  const config = loadConfig();
   const server = createServer();
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+
+  if (config.transport === 'sse') {
+    const { connectHttp } = await import('./transport.js');
+    await connectHttp(server, config.port);
+  } else {
+    const { connectStdio } = await import('./transport.js');
+    await connectStdio(server);
+  }
 }

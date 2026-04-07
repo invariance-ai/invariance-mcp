@@ -1,4 +1,4 @@
-import { parseApiError } from './errors.js';
+import { InvarianceApiError, parseApiError } from './errors.js';
 import type {
   UserInfo,
   Trace,
@@ -12,7 +12,27 @@ import type {
   QueryResult,
   DocSearchResult,
   PaginatedResponse,
+  CreateMonitorInput,
+  CreateDatasetInput,
 } from '../types/index.js';
+
+const MAX_RETRIES = 3;
+const BASE_DELAY_MS = 1000;
+
+function getTimeoutMs(): number {
+  const envTimeout = process.env.INVARIANCE_TIMEOUT;
+  if (envTimeout) {
+    const parsed = Number(envTimeout);
+    if (!Number.isNaN(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+  return 30_000;
+}
+
+function isRetryable(status: number): boolean {
+  return status === 429 || status >= 500;
+}
 
 export class InvarianceClient {
   private readonly baseUrl: string;
@@ -42,17 +62,56 @@ export class InvarianceClient {
       }
     }
 
-    const response = await fetch(url.toString(), {
-      method,
-      headers: this.headers,
-      body: body ? JSON.stringify(body) : undefined,
-    });
+    const timeoutMs = getTimeoutMs();
 
-    if (!response.ok) {
-      throw await parseApiError(response);
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+      let response: Response;
+      try {
+        response = await fetch(url.toString(), {
+          method,
+          headers: this.headers,
+          body: body ? JSON.stringify(body) : undefined,
+          signal: controller.signal,
+        });
+      } catch (error) {
+        clearTimeout(timer);
+        if (attempt < MAX_RETRIES && error instanceof Error && error.name === 'AbortError') {
+          await this.delay(BASE_DELAY_MS * Math.pow(2, attempt));
+          continue;
+        }
+        throw error;
+      } finally {
+        clearTimeout(timer);
+      }
+
+      if (!response.ok) {
+        if (attempt < MAX_RETRIES && isRetryable(response.status)) {
+          const retryAfter = response.headers.get('Retry-After');
+          let delayMs = BASE_DELAY_MS * Math.pow(2, attempt);
+          if (response.status === 429 && retryAfter) {
+            const retrySeconds = Number(retryAfter);
+            if (!Number.isNaN(retrySeconds)) {
+              delayMs = retrySeconds * 1000;
+            }
+          }
+          await this.delay(delayMs);
+          continue;
+        }
+        throw await parseApiError(response);
+      }
+
+      return (await response.json()) as T;
     }
 
-    return (await response.json()) as T;
+    // This should be unreachable, but satisfies TypeScript
+    throw new InvarianceApiError(0, 'Max retries exceeded');
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   private get<T>(
@@ -114,6 +173,16 @@ export class InvarianceClient {
     );
   }
 
+  async createMonitor(input: CreateMonitorInput): Promise<Monitor> {
+    return this.post<Monitor>('/v1/monitors', input);
+  }
+
+  async getMonitor(monitorId: string): Promise<Monitor> {
+    return this.get<Monitor>(
+      `/v1/monitors/${encodeURIComponent(monitorId)}`,
+    );
+  }
+
   // ---- Signals ----
 
   async listSignals(params: {
@@ -148,6 +217,10 @@ export class InvarianceClient {
     });
   }
 
+  async createDataset(input: CreateDatasetInput): Promise<Dataset> {
+    return this.post<Dataset>('/v1/datasets', input);
+  }
+
   // ---- Evaluations ----
 
   async listEvals(params: {
@@ -158,5 +231,11 @@ export class InvarianceClient {
       limit: params.limit,
       dataset_id: params.dataset_id,
     });
+  }
+
+  async getEval(evalId: string): Promise<Evaluation> {
+    return this.get<Evaluation>(
+      `/v1/evals/${encodeURIComponent(evalId)}`,
+    );
   }
 }

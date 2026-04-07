@@ -38,4 +38,52 @@ describe('loadConfig', () => {
     const config = loadConfig();
     expect(config.baseUrl).toBe('https://api.example.com');
   });
+
+  // ── Transport config ──
+
+  it('defaults transport to stdio', () => {
+    process.env.INVARIANCE_API_KEY = 'test-key';
+    delete process.env.INVARIANCE_MCP_TRANSPORT;
+    const config = loadConfig();
+    expect(config.transport).toBe('stdio');
+  });
+
+  it('accepts sse transport', () => {
+    process.env.INVARIANCE_API_KEY = 'test-key';
+    process.env.INVARIANCE_MCP_TRANSPORT = 'sse';
+    const config = loadConfig();
+    expect(config.transport).toBe('sse');
+  });
+
+  it('throws on invalid transport', () => {
+    process.env.INVARIANCE_API_KEY = 'test-key';
+    process.env.INVARIANCE_MCP_TRANSPORT = 'websocket';
+    expect(() => loadConfig()).toThrow('Invalid INVARIANCE_MCP_TRANSPORT');
+  });
+
+  it('defaults port to 3000', () => {
+    process.env.INVARIANCE_API_KEY = 'test-key';
+    delete process.env.INVARIANCE_MCP_PORT;
+    const config = loadConfig();
+    expect(config.port).toBe(3000);
+  });
+
+  it('accepts custom port', () => {
+    process.env.INVARIANCE_API_KEY = 'test-key';
+    process.env.INVARIANCE_MCP_PORT = '8080';
+    const config = loadConfig();
+    expect(config.port).toBe(8080);
+  });
+
+  it('throws on invalid port', () => {
+    process.env.INVARIANCE_API_KEY = 'test-key';
+    process.env.INVARIANCE_MCP_PORT = 'abc';
+    expect(() => loadConfig()).toThrow('Invalid INVARIANCE_MCP_PORT');
+  });
+
+  it('throws on port out of range', () => {
+    process.env.INVARIANCE_API_KEY = 'test-key';
+    process.env.INVARIANCE_MCP_PORT = '99999';
+    expect(() => loadConfig()).toThrow('Invalid INVARIANCE_MCP_PORT');
+  });
 });

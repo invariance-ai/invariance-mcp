@@ -21,6 +21,8 @@ export default [
         Response: 'readonly',
         URL: 'readonly',
         URLSearchParams: 'readonly',
+        Headers: 'readonly',
+        AbortController: 'readonly',
       },
     },
     plugins: {

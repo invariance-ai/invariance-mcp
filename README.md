@@ -24,6 +24,9 @@ npx @invariance/mcp
 |----------|----------|---------|-------------|
 | `INVARIANCE_API_KEY` | Yes | — | Your Invariance API key |
 | `INVARIANCE_BASE_URL` | No | `https://api.invariance.ai` | API base URL |
+| `INVARIANCE_MCP_TRANSPORT` | No | `stdio` | Transport mode: `stdio` or `sse` |
+| `INVARIANCE_MCP_PORT` | No | `3000` | Port for SSE/HTTP transport |
+| `INVARIANCE_TIMEOUT` | No | `30000` | Request timeout in milliseconds |
 
 Get your API key at [app.invariance.ai/settings/api-keys](https://app.invariance.ai/settings/api-keys).
 
@@ -96,6 +99,10 @@ Add to your Cursor MCP settings (`.cursor/mcp.json`):
 | `search_docs` | Search Invariance documentation for a topic |
 | `list_datasets` | List available evaluation datasets |
 | `list_evals` | List evaluation runs with optional dataset filtering |
+| `create_monitor` | Create a new monitor in Invariance to track agent behavior |
+| `create_dataset` | Create a new evaluation dataset in Invariance |
+| `get_monitor` | Get detailed information about a specific monitor including recent runs |
+| `get_eval` | Get detailed results of an evaluation run |
 
 ## Available prompts
 
@@ -112,6 +119,18 @@ Add to your Cursor MCP settings (`.cursor/mcp.json`):
 | `invariance://docs/{topic}` | Invariance documentation by topic |
 
 Topics: `getting-started`, `authentication`, `traces`, `monitors`, `signals`, `queries`, `datasets`, `evals`
+
+### SSE/HTTP transport
+
+To run the server in SSE/HTTP mode instead of stdio:
+
+```bash
+INVARIANCE_API_KEY=your-api-key INVARIANCE_MCP_TRANSPORT=sse INVARIANCE_MCP_PORT=3000 npx @invariance/mcp
+```
+
+The server exposes a Streamable HTTP endpoint at `http://127.0.0.1:3000/mcp` and a health check at `http://127.0.0.1:3000/health`.
+
+MCP clients that support HTTP transport can connect using the `/mcp` endpoint URL instead of spawning a subprocess.
 
 ## Troubleshooting
 

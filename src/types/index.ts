@@ -126,6 +126,20 @@ export interface PaginatedResponse<T> {
   total?: number;
 }
 
+export interface CreateMonitorInput {
+  name: string;
+  description: string;
+  query: string;
+  schedule?: string;
+  threshold?: number;
+}
+
+export interface CreateDatasetInput {
+  name: string;
+  description: string;
+  items?: unknown[];
+}
+
 export interface ApiError {
   statusCode: number;
   message: string;

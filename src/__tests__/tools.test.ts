@@ -12,6 +12,10 @@ import { getSessionTool } from '../tools/get-session.js';
 import { searchDocsTool } from '../tools/search-docs.js';
 import { listDatasetsTool } from '../tools/list-datasets.js';
 import { listEvalsTool } from '../tools/list-evals.js';
+import { createMonitorTool } from '../tools/create-monitor.js';
+import { createDatasetTool } from '../tools/create-dataset.js';
+import { getMonitorTool } from '../tools/get-monitor.js';
+import { getEvalTool } from '../tools/get-eval.js';
 
 describe('tool input schemas', () => {
   it('whoami accepts empty input', () => {
@@ -97,6 +101,66 @@ describe('tool input schemas', () => {
     expect(result.success).toBe(true);
   });
 
+  // ── New tools ──
+
+  it('create_monitor requires name, description, query', () => {
+    const result = createMonitorTool.inputSchema.safeParse({});
+    expect(result.success).toBe(false);
+  });
+
+  it('create_monitor accepts valid input with optional fields', () => {
+    const result = createMonitorTool.inputSchema.safeParse({
+      name: 'Test Monitor',
+      description: 'A test monitor',
+      query: 'status == "error"',
+      schedule: '0 * * * *',
+      threshold: 10,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('create_monitor accepts valid input without optional fields', () => {
+    const result = createMonitorTool.inputSchema.safeParse({
+      name: 'Test Monitor',
+      description: 'A test monitor',
+      query: 'status == "error"',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('create_dataset requires name and description', () => {
+    const result = createDatasetTool.inputSchema.safeParse({});
+    expect(result.success).toBe(false);
+  });
+
+  it('create_dataset accepts valid input', () => {
+    const result = createDatasetTool.inputSchema.safeParse({
+      name: 'Test Dataset',
+      description: 'A test dataset',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('get_monitor requires monitor_id', () => {
+    const result = getMonitorTool.inputSchema.safeParse({});
+    expect(result.success).toBe(false);
+  });
+
+  it('get_monitor rejects empty monitor_id', () => {
+    const result = getMonitorTool.inputSchema.safeParse({ monitor_id: '' });
+    expect(result.success).toBe(false);
+  });
+
+  it('get_eval requires eval_id', () => {
+    const result = getEvalTool.inputSchema.safeParse({});
+    expect(result.success).toBe(false);
+  });
+
+  it('get_eval rejects empty eval_id', () => {
+    const result = getEvalTool.inputSchema.safeParse({ eval_id: '' });
+    expect(result.success).toBe(false);
+  });
+
   it('all tools have names and descriptions', () => {
     const tools = [
       whoamiTool,
@@ -110,6 +174,10 @@ describe('tool input schemas', () => {
       searchDocsTool,
       listDatasetsTool,
       listEvalsTool,
+      createMonitorTool,
+      createDatasetTool,
+      getMonitorTool,
+      getEvalTool,
     ];
     for (const tool of tools) {
       expect(tool.name).toBeTruthy();
