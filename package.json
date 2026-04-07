@@ -1,0 +1,66 @@
+{
+  "name": "@invariance/mcp",
+  "version": "0.1.0",
+  "description": "Invariance MCP server — connect AI coding agents to the Invariance observability platform",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "invariance-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "lint": "eslint src/",
+    "format": "prettier --write src/",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "pnpm build",
+    "start": "node dist/index.js"
+  },
+  "keywords": [
+    "mcp",
+    "invariance",
+    "observability",
+    "ai",
+    "agents",
+    "model-context-protocol"
+  ],
+  "author": "Invariance AI <engineering@invariance.ai>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/invariance-ai/invariance-mcp.git"
+  },
+  "homepage": "https://github.com/invariance-ai/invariance-mcp",
+  "bugs": {
+    "url": "https://github.com/invariance-ai/invariance-mcp/issues"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "zod": "^3.24.4"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.29.4",
+    "@eslint/js": "^10.0.0",
+    "@types/node": "^20.17.32",
+    "@typescript-eslint/eslint-plugin": "^8.58.0",
+    "@typescript-eslint/parser": "^8.58.0",
+    "eslint": "^10.2.0",
+    "prettier": "^3.5.3",
+    "tsup": "^8.4.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.1"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

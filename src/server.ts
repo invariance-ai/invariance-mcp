@@ -1,0 +1,352 @@
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { z } from 'zod';
+
+import { loadConfig } from './lib/config.js';
+import { InvarianceClient } from './lib/client.js';
+import { handleToolError } from './lib/errors.js';
+
+import { whoamiTool } from './tools/whoami.js';
+import { listTracesTool } from './tools/list-traces.js';
+import { getTraceTool } from './tools/get-trace.js';
+import { queryTool } from './tools/query.js';
+import { listMonitorsTool } from './tools/list-monitors.js';
+import { runMonitorTool } from './tools/run-monitor.js';
+import { listSignalsTool } from './tools/list-signals.js';
+import { getSessionTool } from './tools/get-session.js';
+import { searchDocsTool } from './tools/search-docs.js';
+import { listDatasetsTool } from './tools/list-datasets.js';
+import { listEvalsTool } from './tools/list-evals.js';
+
+import { troubleshootingPrompt } from './prompts/troubleshooting.js';
+import { monitorInvestigationPrompt } from './prompts/monitor-investigation.js';
+import { traceAnalysisPrompt } from './prompts/trace-analysis.js';
+
+import { getDocContent, VALID_TOPICS } from './resources/docs.js';
+
+export function createServer(): McpServer {
+  const config = loadConfig();
+  const client = new InvarianceClient(config.apiKey, config.baseUrl);
+
+  const server = new McpServer({
+    name: 'Invariance',
+    version: '0.1.0',
+  });
+
+  // ── Tools ──────────────────────────────────────────────────────────
+
+  server.tool(
+    whoamiTool.name,
+    whoamiTool.description,
+    {},
+    async () => {
+      try {
+        return await whoamiTool.execute(client, {});
+      } catch (error) {
+        handleToolError(error);
+      }
+    },
+  );
+
+  server.tool(
+    listTracesTool.name,
+    listTracesTool.description,
+    {
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Maximum number of traces to return (1-100, default 20)'),
+      status: z
+        .string()
+        .optional()
+        .describe('Filter by trace status (e.g. "completed", "error")'),
+      cursor: z
+        .string()
+        .optional()
+        .describe('Pagination cursor from a previous response'),
+    },
+    async (input) => {
+      try {
+        return await listTracesTool.execute(client, input);
+      } catch (error) {
+        handleToolError(error);
+      }
+    },
+  );
+
+  server.tool(
+    getTraceTool.name,
+    getTraceTool.description,
+    {
+      trace_id: z.string().min(1).describe('The ID of the trace to retrieve'),
+    },
+    async (input) => {
+      try {
+        return await getTraceTool.execute(client, input);
+      } catch (error) {
+        handleToolError(error);
+      }
+    },
+  );
+
+  server.tool(
+    queryTool.name,
+    queryTool.description,
+    {
+      prompt: z
+        .string()
+        .min(1)
+        .describe(
+          'Natural language query to analyze your observability data',
+        ),
+    },
+    async (input) => {
+      try {
+        return await queryTool.execute(client, input);
+      } catch (error) {
+        handleToolError(error);
+      }
+    },
+  );
+
+  server.tool(
+    listMonitorsTool.name,
+    listMonitorsTool.description,
+    {
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe(
+          'Maximum number of monitors to return (1-100, default 20)',
+        ),
+      status: z
+        .string()
+        .optional()
+        .describe('Filter by monitor status (e.g. "active", "paused")'),
+    },
+    async (input) => {
+      try {
+        return await listMonitorsTool.execute(client, input);
+      } catch (error) {
+        handleToolError(error);
+      }
+    },
+  );
+
+  server.tool(
+    runMonitorTool.name,
+    runMonitorTool.description,
+    {
+      monitor_id: z
+        .string()
+        .min(1)
+        .describe('The ID of the monitor to run'),
+    },
+    async (input) => {
+      try {
+        return await runMonitorTool.execute(client, input);
+      } catch (error) {
+        handleToolError(error);
+      }
+    },
+  );
+
+  server.tool(
+    listSignalsTool.name,
+    listSignalsTool.description,
+    {
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Maximum number of signals to return (1-100, default 20)'),
+    },
+    async (input) => {
+      try {
+        return await listSignalsTool.execute(client, input);
+      } catch (error) {
+        handleToolError(error);
+      }
+    },
+  );
+
+  server.tool(
+    getSessionTool.name,
+    getSessionTool.description,
+    {
+      session_id: z
+        .string()
+        .min(1)
+        .describe('The ID of the session to retrieve'),
+    },
+    async (input) => {
+      try {
+        return await getSessionTool.execute(client, input);
+      } catch (error) {
+        handleToolError(error);
+      }
+    },
+  );
+
+  server.tool(
+    searchDocsTool.name,
+    searchDocsTool.description,
+    {
+      query: z
+        .string()
+        .min(1)
+        .describe('Search query for Invariance documentation'),
+    },
+    async (input) => {
+      try {
+        return await searchDocsTool.execute(client, input);
+      } catch (error) {
+        handleToolError(error);
+      }
+    },
+  );
+
+  server.tool(
+    listDatasetsTool.name,
+    listDatasetsTool.description,
+    {
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe(
+          'Maximum number of datasets to return (1-100, default 20)',
+        ),
+    },
+    async (input) => {
+      try {
+        return await listDatasetsTool.execute(client, input);
+      } catch (error) {
+        handleToolError(error);
+      }
+    },
+  );
+
+  server.tool(
+    listEvalsTool.name,
+    listEvalsTool.description,
+    {
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe(
+          'Maximum number of evaluations to return (1-100, default 20)',
+        ),
+      dataset_id: z
+        .string()
+        .optional()
+        .describe('Filter evaluations by dataset ID'),
+    },
+    async (input) => {
+      try {
+        return await listEvalsTool.execute(client, input);
+      } catch (error) {
+        handleToolError(error);
+      }
+    },
+  );
+
+  // ── Prompts ────────────────────────────────────────────────────────
+
+  server.prompt(
+    troubleshootingPrompt.name,
+    troubleshootingPrompt.description,
+    {
+      issue_description: z
+        .string()
+        .describe('Description of the issue you are experiencing'),
+    },
+    (input) => {
+      return troubleshootingPrompt.render(input);
+    },
+  );
+
+  server.prompt(
+    monitorInvestigationPrompt.name,
+    monitorInvestigationPrompt.description,
+    {
+      monitor_id: z
+        .string()
+        .describe('The ID of the monitor to investigate'),
+    },
+    (input) => {
+      return monitorInvestigationPrompt.render(input);
+    },
+  );
+
+  server.prompt(
+    traceAnalysisPrompt.name,
+    traceAnalysisPrompt.description,
+    {
+      trace_id: z
+        .string()
+        .describe('The ID of the trace to analyze'),
+    },
+    (input) => {
+      return traceAnalysisPrompt.render(input);
+    },
+  );
+
+  // ── Resources ──────────────────────────────────────────────────────
+
+  server.resource(
+    'invariance-docs',
+    'invariance://docs/{topic}',
+    {
+      description: `Invariance documentation. Available topics: ${VALID_TOPICS.join(', ')}`,
+      mimeType: 'text/markdown',
+    },
+    async (uri) => {
+      const topic = uri.pathname.replace(/^\/\/docs\//, '').replace(/^\//, '');
+      const doc = getDocContent(topic);
+
+      if (!doc) {
+        return {
+          contents: [
+            {
+              uri: uri.href,
+              mimeType: 'text/plain',
+              text: `Unknown topic: "${topic}". Available topics: ${VALID_TOPICS.join(', ')}`,
+            },
+          ],
+        };
+      }
+
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: 'text/markdown',
+            text: doc.content,
+          },
+        ],
+      };
+    },
+  );
+
+  return server;
+}
+
+export async function startServer(): Promise<void> {
+  const server = createServer();
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+}
