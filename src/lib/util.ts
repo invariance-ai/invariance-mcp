@@ -3,7 +3,7 @@ export function parseJsonArg(name: string, value: string | undefined): unknown {
   try {
     return JSON.parse(value);
   } catch (err) {
-    throw new Error(`Invalid JSON in "${name}": ${(err as Error).message}`);
+    throw new Error(`Invalid JSON in "${name}": ${(err as Error).message}`, { cause: err });
   }
 }
 

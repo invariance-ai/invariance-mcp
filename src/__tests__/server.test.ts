@@ -69,7 +69,7 @@ function contentJson(result: Awaited<ReturnType<Client['callTool']>>): unknown {
 let client: Client;
 let server: McpServer;
 let requests: Recorded[];
-let originalEnv: NodeJS.ProcessEnv;
+let originalEnv: typeof process.env;
 
 beforeEach(async () => {
   originalEnv = { ...process.env };
