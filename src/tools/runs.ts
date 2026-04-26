@@ -6,10 +6,15 @@ import { jsonResult, parseJsonArg } from '../lib/util.js';
 export function registerRunTools(server: McpServer, client: InvarianceClient): void {
   server.tool(
     'invariance_run_start',
-    'Start a new Invariance run',
+    'Start a new Invariance run (the container for a sequence of nodes). The returned run is in status "open" — you must close it later with invariance_run_finish (success) or invariance_run_fail (error).',
     {
-      name: z.string().optional().describe('Run name'),
-      metadata: z.string().optional().describe('Run metadata as a JSON object string'),
+      name: z.string().optional().describe('Human-readable run name shown in dashboards.'),
+      metadata: z
+        .string()
+        .optional()
+        .describe(
+          'Free-form metadata as a JSON object string. Example: {"user_id":"u_42","workspace":"acme","risk_tier":"high"}',
+        ),
     },
     async ({ name, metadata }) => {
       const body: Record<string, unknown> = {};
@@ -23,8 +28,8 @@ export function registerRunTools(server: McpServer, client: InvarianceClient): v
 
   server.tool(
     'invariance_run_get',
-    'Get details of an Invariance run',
-    { id: z.string().describe('Run ID') },
+    'Get details of an Invariance run (status, metadata, aggregate counts, timestamps).',
+    { id: z.string().describe('Run ID, e.g. "run_abc123".') },
     async ({ id }) => {
       const res = await client.get<{ run: unknown }>(`/v1/runs/${encodeURIComponent(id)}`);
       return jsonResult(res.run);
@@ -33,9 +38,12 @@ export function registerRunTools(server: McpServer, client: InvarianceClient): v
 
   server.tool(
     'invariance_run_list',
-    'List Invariance runs (paginated)',
+    'List runs visible to the calling agent in reverse-chronological order (paginated).',
     {
-      cursor: z.string().optional(),
+      cursor: z
+        .string()
+        .optional()
+        .describe('opaque pagination token from previous response next_cursor; pass through unchanged'),
       limit: z.number().int().positive().max(200).optional(),
     },
     async ({ cursor, limit }) =>
@@ -44,7 +52,7 @@ export function registerRunTools(server: McpServer, client: InvarianceClient): v
 
   server.tool(
     'invariance_run_finish',
-    'Mark a run as completed',
+    'Close a run successfully — sets status to "completed". Use this when the agent finished its work without errors. For failures, use invariance_run_fail instead.',
     { id: z.string() },
     async ({ id }) => {
       const res = await client.patch<{ run: unknown }>(
@@ -57,10 +65,10 @@ export function registerRunTools(server: McpServer, client: InvarianceClient): v
 
   server.tool(
     'invariance_run_fail',
-    'Mark a run as failed',
+    'Close a run with failure — sets status to "failed" and stores the optional error string in metadata.error. Use this when the agent aborted due to an exception or unrecoverable error. For successful completion, use invariance_run_finish.',
     {
       id: z.string(),
-      error: z.string().optional().describe('Error description (stored in metadata.error)'),
+      error: z.string().optional().describe('Short error description, stored at metadata.error (e.g. exception message).'),
     },
     async ({ id, error }) => {
       const body: Record<string, unknown> = { status: 'failed' };
@@ -75,7 +83,7 @@ export function registerRunTools(server: McpServer, client: InvarianceClient): v
 
   server.tool(
     'invariance_run_verify',
-    'Verify the proof chain for a run',
+    'Verify the cryptographic proof chain for a run — recomputes node hashes and Ed25519 signatures end-to-end. Returns {valid, node_count, head_hash, first_invalid_node_id, reason}.',
     { id: z.string() },
     async ({ id }) =>
       jsonResult(await client.get(`/v1/runs/${encodeURIComponent(id)}/verify`)),
@@ -83,7 +91,7 @@ export function registerRunTools(server: McpServer, client: InvarianceClient): v
 
   server.tool(
     'invariance_run_metrics',
-    'Aggregate metrics for a run (token counts, cost, latency)',
+    'Aggregate metrics for a run: total_input_tokens, total_output_tokens, total_cache_read/write, total_cost_usd, llm_call_count, tool_call_count, error_count, total_latency_ms.',
     { id: z.string() },
     async ({ id }) =>
       jsonResult(await client.get(`/v1/runs/${encodeURIComponent(id)}/metrics`)),
