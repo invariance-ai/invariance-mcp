@@ -1,6 +1,6 @@
 # @invariance/mcp
 
-An MCP (Model Context Protocol) server that connects AI coding agents to the [Invariance](https://invariance.ai) observability platform. It gives tools like Claude Desktop, Cursor, and Claude Code direct access to your traces, monitors, signals, and more.
+An MCP (Model Context Protocol) server that connects AI coding agents to the [Invariance](https://invariance.ai) observability platform. It gives tools like Claude Desktop, Cursor, and Claude Code direct access to your runs, nodes, monitors, signals, findings, reviews, and more.
 
 MCP is an open protocol that lets AI assistants use external tools and data sources. This server implements it for Invariance, so your AI assistant can query observability data, investigate issues, and analyze agent behavior without leaving the conversation.
 
@@ -86,46 +86,44 @@ Add to your Cursor MCP settings (`.cursor/mcp.json`):
 
 ## Available tools
 
-| Tool | Description |
-|------|-------------|
-| `whoami` | Get information about the authenticated Invariance user and organization |
-| `list_traces` | List recent traces from Invariance with optional filtering |
-| `get_trace` | Get detailed information about a specific trace by ID |
-| `query_invariance` | Query Invariance with a natural language prompt to analyze traces, monitors, and signals |
-| `list_monitors` | List configured monitors in Invariance |
-| `run_monitor` | Trigger a monitor run and return the results |
-| `list_signals` | List signals detected by Invariance monitors |
-| `get_session` | Get detailed information about an agent session |
-| `search_docs` | Search Invariance documentation for a topic |
-| `list_datasets` | List available evaluation datasets |
-| `list_evals` | List evaluation runs with optional dataset filtering |
-| `create_monitor` | Create a new monitor in Invariance to track agent behavior |
-| `create_dataset` | Create a new evaluation dataset in Invariance |
-| `get_monitor` | Get detailed information about a specific monitor including recent runs |
-| `get_eval` | Get detailed results of an evaluation run |
+The server exposes **37 tools** covering the full Invariance API. Names follow `invariance_<resource>_<action>`.
 
-## Available prompts
+**Runs** (`invariance_run_*`)
+`start`, `get`, `list`, `finish`, `fail`, `verify`, `metrics`
 
-| Prompt | Description |
-|--------|-------------|
-| `troubleshooting` | Help troubleshoot an issue with an Invariance-monitored agent |
-| `monitor-investigation` | Investigate why a monitor triggered or is failing |
-| `trace-analysis` | Analyze a trace to identify issues, bottlenecks, or anomalies |
+**Nodes** (`invariance_node_*`)
+`write`, `list`
 
-## Available resources
+**Monitors** (`invariance_monitor_*`)
+`create`, `list`, `get`, `update`, `pause`, `resume`, `evaluate`, `executions`, `findings`
 
-| URI | Description |
-|-----|-------------|
-| `invariance://docs/{topic}` | Invariance documentation by topic |
+**Signals** (`invariance_signal_*`)
+`emit`, `list`, `get`, `acknowledge`, `resolve`
 
-Topics: `getting-started`, `authentication`, `traces`, `monitors`, `signals`, `queries`, `datasets`, `evals`
+**Findings** (`invariance_finding_*`)
+`list`, `get`, `update`
 
-### SSE/HTTP transport
+**Reviews** (`invariance_review_*`)
+`list`, `get`, `claim`, `unclaim`, `resolve`
 
-To run the server in SSE/HTTP mode instead of stdio:
+**Agents** (`invariance_agent_*`)
+`me`, `set_key`
+
+**Insights**
+`invariance_narrative_get` (LLM-synthesized run summary), `invariance_ask` (turn-based Q&A over your KB + runs), `invariance_kb_pages_list`, `invariance_kb_page_get`
+
+For complex object arguments (monitor body, signal data, node input/output, run metadata) tools accept JSON-encoded strings, which the server parses before dispatching to the API.
+
+### Legacy tool aliases
+
+The original 6 tool names from earlier versions are kept as aliases so existing client configs keep working: `invariance_create_run`, `invariance_get_run`, `invariance_list_runs`, `invariance_write_node`, `invariance_list_nodes`, `invariance_verify_run`.
+
+### HTTP transport
+
+To run the server over Streamable HTTP instead of stdio:
 
 ```bash
-INVARIANCE_API_KEY=your-api-key INVARIANCE_MCP_TRANSPORT=sse INVARIANCE_MCP_PORT=3000 npx @invariance/mcp
+INVARIANCE_API_KEY=your-api-key INVARIANCE_MCP_TRANSPORT=http INVARIANCE_MCP_PORT=3000 npx @invariance/mcp
 ```
 
 The server exposes a Streamable HTTP endpoint at `http://127.0.0.1:3000/mcp` and a health check at `http://127.0.0.1:3000/health`.
