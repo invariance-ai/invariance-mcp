@@ -1,38 +1,36 @@
 import { InvarianceApiError, parseApiError } from './errors.js';
-import type {
-  UserInfo,
-  Trace,
-  TraceDetail,
-  Monitor,
-  MonitorRunResult,
-  Signal,
-  Session,
-  Dataset,
-  Evaluation,
-  QueryResult,
-  DocSearchResult,
-  PaginatedResponse,
-  CreateMonitorInput,
-  CreateDatasetInput,
-} from '../types/index.js';
 
+const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_RETRIES = 3;
-const BASE_DELAY_MS = 1000;
+const BASE_DELAY_MS = 500;
+const MAX_DELAY_MS = 5_000;
 
 function getTimeoutMs(): number {
-  const envTimeout = process.env.INVARIANCE_TIMEOUT;
-  if (envTimeout) {
-    const parsed = Number(envTimeout);
-    if (!Number.isNaN(parsed) && parsed > 0) {
-      return parsed;
-    }
+  const env = process.env.INVARIANCE_TIMEOUT;
+  if (env) {
+    const parsed = Number(env);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
   }
-  return 30_000;
+  return DEFAULT_TIMEOUT_MS;
 }
 
 function isRetryable(status: number): boolean {
   return status === 429 || status >= 500;
 }
+
+function backoff(attempt: number, retryAfterSec?: number): number {
+  if (retryAfterSec !== undefined && retryAfterSec > 0) {
+    return Math.min(retryAfterSec * 1000, MAX_DELAY_MS);
+  }
+  const exp = BASE_DELAY_MS * 2 ** (attempt - 1);
+  const jitter = Math.random() * BASE_DELAY_MS;
+  return Math.min(exp + jitter, MAX_DELAY_MS);
+}
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
+export type Query = Record<string, string | number | boolean | undefined | null>;
 
 export class InvarianceClient {
   private readonly baseUrl: string;
@@ -43,203 +41,84 @@ export class InvarianceClient {
     this.headers = {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
-      'User-Agent': 'invariance-mcp/0.1.0',
+      'User-Agent': 'invariance-mcp',
     };
   }
 
-  private async request<T>(
-    method: string,
+  async request<T>(
+    method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE',
     path: string,
     body?: unknown,
-    query?: Record<string, string | number | undefined>,
+    query?: Query,
   ): Promise<T> {
     const url = new URL(`${this.baseUrl}${path}`);
     if (query) {
-      for (const [key, value] of Object.entries(query)) {
-        if (value !== undefined) {
-          url.searchParams.set(key, String(value));
-        }
+      for (const [k, v] of Object.entries(query)) {
+        if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
       }
     }
-
     const timeoutMs = getTimeoutMs();
 
+    let lastErr: unknown;
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
-
       let response: Response;
       try {
         response = await fetch(url.toString(), {
           method,
           headers: this.headers,
-          body: body ? JSON.stringify(body) : undefined,
+          body: body !== undefined ? JSON.stringify(body) : undefined,
           signal: controller.signal,
         });
-      } catch (error) {
+      } catch (err) {
         clearTimeout(timer);
-        if (attempt < MAX_RETRIES && error instanceof Error && error.name === 'AbortError') {
-          await this.delay(BASE_DELAY_MS * Math.pow(2, attempt));
-          continue;
-        }
-        throw error;
+        lastErr = err;
+        if (attempt >= MAX_RETRIES) throw err;
+        await sleep(backoff(attempt + 1));
+        continue;
       } finally {
         clearTimeout(timer);
       }
 
-      if (!response.ok) {
-        if (attempt < MAX_RETRIES && isRetryable(response.status)) {
-          const retryAfter = response.headers.get('Retry-After');
-          let delayMs = BASE_DELAY_MS * Math.pow(2, attempt);
-          if (response.status === 429 && retryAfter) {
-            const retrySeconds = Number(retryAfter);
-            if (!Number.isNaN(retrySeconds)) {
-              delayMs = retrySeconds * 1000;
-            }
-          }
-          await this.delay(delayMs);
-          continue;
-        }
-        throw await parseApiError(response);
+      if (response.ok) {
+        if (response.status === 204) return undefined as T;
+        const text = await response.text();
+        return text ? (JSON.parse(text) as T) : (undefined as T);
       }
 
-      return (await response.json()) as T;
+      const text = await response.text();
+      let parsed: unknown;
+      try {
+        parsed = text ? JSON.parse(text) : undefined;
+      } catch {
+        parsed = { error: { message: text || `HTTP ${response.status}` } };
+      }
+
+      if (isRetryable(response.status) && attempt < MAX_RETRIES) {
+        const ra = Number(response.headers.get('retry-after')) || undefined;
+        await sleep(backoff(attempt + 1, ra));
+        continue;
+      }
+
+      throw parseApiError(response.status, parsed);
     }
-
-    // This should be unreachable, but satisfies TypeScript
-    throw new InvarianceApiError(0, 'Max retries exceeded');
+    throw lastErr ?? new InvarianceApiError(0, 'request failed');
   }
 
-  private delay(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
-  private get<T>(
-    path: string,
-    query?: Record<string, string | number | undefined>,
-  ): Promise<T> {
+  get<T>(path: string, query?: Query): Promise<T> {
     return this.request<T>('GET', path, undefined, query);
   }
-
-  private post<T>(path: string, body?: unknown): Promise<T> {
+  post<T>(path: string, body?: unknown): Promise<T> {
     return this.request<T>('POST', path, body);
   }
-
-  // ---- User ----
-
-  async whoami(): Promise<UserInfo> {
-    return this.get<UserInfo>('/v1/auth/me');
+  patch<T>(path: string, body?: unknown): Promise<T> {
+    return this.request<T>('PATCH', path, body);
   }
-
-  // ---- Traces ----
-
-  async listTraces(params: {
-    limit?: number;
-    status?: string;
-    cursor?: string;
-  }): Promise<PaginatedResponse<Trace>> {
-    return this.get<PaginatedResponse<Trace>>('/v1/traces', {
-      limit: params.limit,
-      status: params.status,
-      cursor: params.cursor,
-    });
+  put<T>(path: string, body?: unknown): Promise<T> {
+    return this.request<T>('PUT', path, body);
   }
-
-  async getTrace(traceId: string): Promise<TraceDetail> {
-    return this.get<TraceDetail>(`/v1/traces/${encodeURIComponent(traceId)}`);
-  }
-
-  // ---- Query ----
-
-  async query(prompt: string): Promise<QueryResult> {
-    return this.post<QueryResult>('/v1/query', { prompt });
-  }
-
-  // ---- Monitors ----
-
-  async listMonitors(params: {
-    limit?: number;
-    status?: string;
-  }): Promise<PaginatedResponse<Monitor>> {
-    return this.get<PaginatedResponse<Monitor>>('/v1/monitors', {
-      limit: params.limit,
-      status: params.status,
-    });
-  }
-
-  async runMonitor(monitorId: string): Promise<MonitorRunResult> {
-    return this.post<MonitorRunResult>(
-      `/v1/monitors/${encodeURIComponent(monitorId)}/run`,
-    );
-  }
-
-  async createMonitor(input: CreateMonitorInput): Promise<Monitor> {
-    return this.post<Monitor>('/v1/monitors', input);
-  }
-
-  async getMonitor(monitorId: string): Promise<Monitor> {
-    return this.get<Monitor>(
-      `/v1/monitors/${encodeURIComponent(monitorId)}`,
-    );
-  }
-
-  // ---- Signals ----
-
-  async listSignals(params: {
-    limit?: number;
-  }): Promise<PaginatedResponse<Signal>> {
-    return this.get<PaginatedResponse<Signal>>('/v1/signals', {
-      limit: params.limit,
-    });
-  }
-
-  // ---- Sessions ----
-
-  async getSession(sessionId: string): Promise<Session> {
-    return this.get<Session>(
-      `/v1/sessions/${encodeURIComponent(sessionId)}`,
-    );
-  }
-
-  // ---- Docs ----
-
-  async searchDocs(query: string): Promise<DocSearchResult[]> {
-    return this.get<DocSearchResult[]>('/v1/docs/search', { q: query });
-  }
-
-  // ---- Datasets ----
-
-  async listDatasets(params: {
-    agent_id?: string;
-  }): Promise<Dataset[]> {
-    return this.get<Dataset[]>('/v1/datasets', {
-      agent_id: params.agent_id,
-    });
-  }
-
-  async createDataset(input: CreateDatasetInput): Promise<Dataset> {
-    return this.post<Dataset>('/v1/datasets', input);
-  }
-
-  // ---- Evaluations ----
-
-  async listEvals(params: {
-    suite_id?: string;
-    agent_id?: string;
-    status?: string;
-    dataset_id?: string;
-  }): Promise<Evaluation[]> {
-    return this.get<Evaluation[]>('/v1/evals/runs', {
-      suite_id: params.suite_id,
-      agent_id: params.agent_id,
-      status: params.status,
-      dataset_id: params.dataset_id,
-    });
-  }
-
-  async getEval(evalId: string): Promise<Evaluation> {
-    return this.get<Evaluation>(
-      `/v1/evals/runs/${encodeURIComponent(evalId)}`,
-    );
+  delete<T>(path: string): Promise<T> {
+    return this.request<T>('DELETE', path);
   }
 }
