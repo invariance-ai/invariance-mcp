@@ -141,6 +141,27 @@ beforeEach(async () => {
     if (method === 'GET' && url.pathname === '/v1/runs/missing') {
       return json({ error: { code: 'not_found', message: 'Run missing not found' } }, 404);
     }
+    if (method === 'POST' && url.pathname === '/v1/kb/pages') {
+      return json({ page: { id: 'page_1', ...body } }, 201);
+    }
+    if (method === 'PATCH' && url.pathname === '/v1/kb/pages/page_1') {
+      return json({ page: { id: 'page_1', ...body } });
+    }
+    if (method === 'DELETE' && url.pathname === '/v1/kb/pages/page_1') {
+      return new Response(null, { status: 204 });
+    }
+    if (method === 'POST' && url.pathname === '/v1/kb/sessions') {
+      return json({ session: { id: 'sess_1', ...body } }, 201);
+    }
+    if (method === 'DELETE' && url.pathname === '/v1/kb/sessions/sess_1') {
+      return new Response(null, { status: 204 });
+    }
+    if (method === 'GET' && url.pathname === '/v1/kb/sessions/sess_1/messages') {
+      return json({ messages: [{ id: 'msg_1', role: 'user', content: 'hi' }] });
+    }
+    if (method === 'POST' && url.pathname === '/v1/kb/sessions/sess_1/messages') {
+      return json({ message: { id: 'msg_2', ...body } }, 201);
+    }
 
     return json(
       { error: { code: 'not_found', message: `${method} ${url.pathname}` } },
@@ -183,6 +204,9 @@ describe('Invariance MCP server', () => {
       'invariance_agent_me', 'invariance_agent_set_key',
       'invariance_narrative_get', 'invariance_ask',
       'invariance_kb_pages_list', 'invariance_kb_page_get',
+      'invariance_kb_page_create', 'invariance_kb_page_update', 'invariance_kb_page_delete',
+      'invariance_kb_session_create', 'invariance_kb_session_delete',
+      'invariance_kb_session_list_messages', 'invariance_kb_session_append_message',
     ]) {
       expect(names.has(expected), `missing tool ${expected}`).toBe(true);
     }
@@ -291,6 +315,52 @@ describe('Invariance MCP server', () => {
     });
     expect(result.isError).toBe(true);
     expect(contentText(result)).toContain('Run missing not found');
+  });
+
+  it('creates a KB page via invariance_kb_page_create', async () => {
+    const result = contentJson(
+      await client.callTool({
+        name: 'invariance_kb_page_create',
+        arguments: { path: 'notes/x', title: 'X', body: '# X', kind: 'note' },
+      }),
+    ) as { id: string; title: string; kind: string };
+    expect(result).toMatchObject({ id: 'page_1', title: 'X', kind: 'note' });
+    const call = requests.find((r) => r.method === 'POST' && r.path === '/v1/kb/pages');
+    expect(call?.body).toEqual({ path: 'notes/x', title: 'X', body: '# X', kind: 'note' });
+  });
+
+  it('appends a message to a KB session, parsing block JSON', async () => {
+    const result = contentJson(
+      await client.callTool({
+        name: 'invariance_kb_session_append_message',
+        arguments: {
+          id: 'sess_1',
+          role: 'user',
+          content: '[{"type":"text","text":"hello"}]',
+        },
+      }),
+    ) as { id: string };
+    expect(result.id).toBe('msg_2');
+    const call = requests.find(
+      (r) => r.method === 'POST' && r.path === '/v1/kb/sessions/sess_1/messages',
+    );
+    expect(call?.body).toEqual({
+      role: 'user',
+      content: [{ type: 'text', text: 'hello' }],
+    });
+  });
+
+  it('deletes a KB page', async () => {
+    const result = contentJson(
+      await client.callTool({
+        name: 'invariance_kb_page_delete',
+        arguments: { id: 'page_1' },
+      }),
+    ) as { id: string; deleted: boolean };
+    expect(result).toEqual({ id: 'page_1', deleted: true });
+    expect(
+      requests.some((r) => r.method === 'DELETE' && r.path === '/v1/kb/pages/page_1'),
+    ).toBe(true);
   });
 
   it('keeps legacy tool names working', async () => {

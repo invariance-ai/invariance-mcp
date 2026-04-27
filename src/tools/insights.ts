@@ -1,7 +1,10 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { InvarianceClient } from '../lib/client.js';
-import { jsonResult } from '../lib/util.js';
+import { jsonResult, parseJsonArg } from '../lib/util.js';
+
+const kbPageKind = z.enum(['wiki', 'run', 'note']);
+const kbMessageRole = z.enum(['user', 'assistant', 'tool']);
 
 export function registerInsightTools(server: McpServer, client: InvarianceClient): void {
   server.tool(
@@ -42,9 +45,9 @@ export function registerInsightTools(server: McpServer, client: InvarianceClient
     'invariance_kb_pages_list',
     'List knowledge-base pages',
     {
-      kind: z.enum(['wiki', 'run', 'note']).optional(),
+      kind: kbPageKind.optional(),
       search: z.string().optional(),
-      cursor: z.string().optional(),
+      cursor: z.string().optional().describe('Opaque cursor from a previous response'),
       limit: z.number().int().positive().max(200).optional(),
     },
     async ({ kind, search, cursor, limit }) =>
@@ -60,6 +63,125 @@ export function registerInsightTools(server: McpServer, client: InvarianceClient
         `/v1/kb/pages/${encodeURIComponent(id)}`,
       );
       return jsonResult(res.page);
+    },
+  );
+
+  server.tool(
+    'invariance_kb_page_create',
+    'Create a knowledge-base page',
+    {
+      path: z.string().describe('Unique slug/path for the page within the agent KB'),
+      title: z.string(),
+      body: z.string().describe('Markdown body of the page'),
+      summary: z.string().optional(),
+      kind: kbPageKind.optional(),
+    },
+    async ({ path, title, body, summary, kind }) => {
+      const payload: Record<string, unknown> = { path, title, body };
+      if (summary !== undefined) payload.summary = summary;
+      if (kind !== undefined) payload.kind = kind;
+      const res = await client.post<{ page: unknown }>('/v1/kb/pages', payload);
+      return jsonResult(res.page);
+    },
+  );
+
+  server.tool(
+    'invariance_kb_page_update',
+    'Update fields on a knowledge-base page',
+    {
+      id: z.string(),
+      title: z.string().optional(),
+      body: z.string().optional(),
+      summary: z.string().optional(),
+      kind: kbPageKind.optional(),
+    },
+    async ({ id, title, body, summary, kind }) => {
+      const payload: Record<string, unknown> = {};
+      if (title !== undefined) payload.title = title;
+      if (body !== undefined) payload.body = body;
+      if (summary !== undefined) payload.summary = summary;
+      if (kind !== undefined) payload.kind = kind;
+      const res = await client.patch<{ page: unknown }>(
+        `/v1/kb/pages/${encodeURIComponent(id)}`,
+        payload,
+      );
+      return jsonResult(res.page);
+    },
+  );
+
+  server.tool(
+    'invariance_kb_page_delete',
+    'Delete a knowledge-base page',
+    { id: z.string() },
+    async ({ id }) => {
+      await client.delete(`/v1/kb/pages/${encodeURIComponent(id)}`);
+      return jsonResult({ id, deleted: true });
+    },
+  );
+
+  server.tool(
+    'invariance_kb_session_create',
+    'Create a multi-turn ask session for the agent KB',
+    {
+      title: z.string().optional(),
+      model: z.string().optional(),
+    },
+    async ({ title, model }) => {
+      const payload: Record<string, unknown> = {};
+      if (title !== undefined) payload.title = title;
+      if (model !== undefined) payload.model = model;
+      const res = await client.post<{ session: unknown }>('/v1/kb/sessions', payload);
+      return jsonResult(res.session);
+    },
+  );
+
+  server.tool(
+    'invariance_kb_session_delete',
+    'Delete a KB ask session',
+    { id: z.string() },
+    async ({ id }) => {
+      await client.delete(`/v1/kb/sessions/${encodeURIComponent(id)}`);
+      return jsonResult({ id, deleted: true });
+    },
+  );
+
+  server.tool(
+    'invariance_kb_session_list_messages',
+    'List all messages in a KB ask session in order',
+    { id: z.string() },
+    async ({ id }) => {
+      const res = await client.get<{ messages: unknown }>(
+        `/v1/kb/sessions/${encodeURIComponent(id)}/messages`,
+      );
+      return jsonResult(res.messages);
+    },
+  );
+
+  server.tool(
+    'invariance_kb_session_append_message',
+    'Append a message to a KB ask session',
+    {
+      id: z.string(),
+      role: kbMessageRole.optional().describe('Defaults to user when omitted'),
+      content: z
+        .string()
+        .describe(
+          'Plain text, OR a JSON-encoded array of content blocks ({type:"text"|"tool_use"|"tool_result", ...})',
+        ),
+    },
+    async ({ id, role, content }) => {
+      let parsedContent: unknown = content;
+      const trimmed = content.trimStart();
+      if (trimmed.startsWith('[')) {
+        parsedContent = parseJsonArg('content', content);
+      }
+      const payload: Record<string, unknown> = { content: parsedContent };
+      if (role !== undefined) payload.role = role;
+      const res = await client.post<{ message: unknown }>(
+        `/v1/kb/sessions/${encodeURIComponent(id)}/messages`,
+        payload,
+      );
+      return jsonResult(res.message);
     },
   );
 }

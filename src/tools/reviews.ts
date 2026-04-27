@@ -8,15 +8,21 @@ const decisionEnum = z.enum(['passed', 'failed', 'needs_fix']);
 export function registerReviewTools(server: McpServer, client: InvarianceClient): void {
   server.tool(
     'invariance_review_list',
-    'List reviews',
-    { cursor: z.string().optional(), limit: z.number().int().positive().max(200).optional() },
+    'List reviews (work items requesting agent/human adjudication of a finding or run) in the queue, paginated.',
+    {
+      cursor: z
+        .string()
+        .optional()
+        .describe('opaque pagination token from previous response next_cursor; pass through unchanged'),
+      limit: z.number().int().positive().max(200).optional(),
+    },
     async ({ cursor, limit }) =>
       jsonResult(await client.get('/v1/reviews', { cursor, limit })),
   );
 
   server.tool(
     'invariance_review_get',
-    'Get a review by ID',
+    'Get a review by ID.',
     { id: z.string() },
     async ({ id }) => {
       const res = await client.get<{ review: unknown }>(
@@ -28,8 +34,11 @@ export function registerReviewTools(server: McpServer, client: InvarianceClient)
 
   server.tool(
     'invariance_review_claim',
-    'Claim a review for the calling agent',
-    { id: z.string(), notes: z.string().optional() },
+    'Claim a pending review for the calling agent — sets status to "claimed" so other agents do not pick it up. Pair with invariance_review_resolve when done, or invariance_review_unclaim to release.',
+    {
+      id: z.string(),
+      notes: z.string().optional().describe('Optional note explaining why or under what context the review is being claimed.'),
+    },
     async ({ id, notes }) => {
       const body: Record<string, unknown> = { status: 'claimed' };
       if (notes !== undefined) body.notes = notes;
@@ -43,8 +52,11 @@ export function registerReviewTools(server: McpServer, client: InvarianceClient)
 
   server.tool(
     'invariance_review_unclaim',
-    'Release a claim on a review',
-    { id: z.string(), notes: z.string().optional() },
+    'Release a previously-claimed review back to "pending" so another agent can pick it up. Does not record a decision — use invariance_review_resolve for that.',
+    {
+      id: z.string(),
+      notes: z.string().optional().describe('Optional note explaining why the review is being released.'),
+    },
     async ({ id, notes }) => {
       const body: Record<string, unknown> = { status: 'pending' };
       if (notes !== undefined) body.notes = notes;
@@ -58,8 +70,12 @@ export function registerReviewTools(server: McpServer, client: InvarianceClient)
 
   server.tool(
     'invariance_review_resolve',
-    'Resolve a review with a decision',
-    { id: z.string(), decision: decisionEnum, notes: z.string().optional() },
+    'Close a review by recording a decision: "passed" (looks good, no action), "failed" (issue confirmed, should not ship), or "needs_fix" (issue confirmed, fix-and-retry).',
+    {
+      id: z.string(),
+      decision: decisionEnum.describe('Outcome: passed | failed | needs_fix'),
+      notes: z.string().optional().describe('Optional rationale for the decision.'),
+    },
     async ({ id, decision, notes }) => {
       const body: Record<string, unknown> = { decision };
       if (notes !== undefined) body.notes = notes;
