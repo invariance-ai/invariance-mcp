@@ -41,13 +41,24 @@ export function createServer(): McpServer {
 }
 
 // Legacy tool names from the prior MCP scaffold. Kept so existing client
-// configs keep working while users migrate to the modern names.
+// configs keep working while users migrate to the modern names. These will be
+// removed in the next minor release.
+const warnedLegacyAliases = new Set<string>();
+function warnLegacyAlias(legacyName: string, modernName: string): void {
+  if (warnedLegacyAliases.has(legacyName)) return;
+  warnedLegacyAliases.add(legacyName);
+  process.stderr.write(
+    `warning: MCP tool "${legacyName}" is deprecated; use "${modernName}" instead. Legacy aliases will be removed in the next minor release.\n`,
+  );
+}
+
 function registerLegacyAliases(server: McpServer, client: InvarianceClient): void {
   server.tool(
     'invariance_create_run',
     'Alias of invariance_run_start',
     { name: z.string().optional() },
     async ({ name }) => {
+      warnLegacyAlias('invariance_create_run', 'invariance_run_start');
       const body: Record<string, unknown> = {};
       if (name !== undefined) body.name = name;
       const res = await client.post<{ run: unknown }>('/v1/runs', body);
@@ -60,6 +71,7 @@ function registerLegacyAliases(server: McpServer, client: InvarianceClient): voi
     'Alias of invariance_run_get',
     { id: z.string() },
     async ({ id }) => {
+      warnLegacyAlias('invariance_get_run', 'invariance_run_get');
       const res = await client.get<{ run: unknown }>(
         `/v1/runs/${encodeURIComponent(id)}`,
       );
@@ -71,7 +83,10 @@ function registerLegacyAliases(server: McpServer, client: InvarianceClient): voi
     'invariance_list_runs',
     'Alias of invariance_run_list',
     {},
-    async () => jsonResult(await client.get('/v1/runs')),
+    async () => {
+      warnLegacyAlias('invariance_list_runs', 'invariance_run_list');
+      return jsonResult(await client.get('/v1/runs'));
+    },
   );
 
   server.tool(
@@ -84,6 +99,7 @@ function registerLegacyAliases(server: McpServer, client: InvarianceClient): voi
       output: z.string().optional(),
     },
     async ({ run_id, action_type, input, output }) => {
+      warnLegacyAlias('invariance_write_node', 'invariance_node_write');
       const node: Record<string, unknown> = { run_id, action_type };
       const i = parseJsonArg('input', input);
       if (i !== undefined) node.input = i;
@@ -98,16 +114,20 @@ function registerLegacyAliases(server: McpServer, client: InvarianceClient): voi
     'invariance_list_nodes',
     'Alias of invariance_node_list',
     { run_id: z.string() },
-    async ({ run_id }) =>
-      jsonResult(await client.get(`/v1/runs/${encodeURIComponent(run_id)}/nodes`)),
+    async ({ run_id }) => {
+      warnLegacyAlias('invariance_list_nodes', 'invariance_node_list');
+      return jsonResult(await client.get(`/v1/runs/${encodeURIComponent(run_id)}/nodes`));
+    },
   );
 
   server.tool(
     'invariance_verify_run',
     'Alias of invariance_run_verify',
     { id: z.string() },
-    async ({ id }) =>
-      jsonResult(await client.get(`/v1/runs/${encodeURIComponent(id)}/verify`)),
+    async ({ id }) => {
+      warnLegacyAlias('invariance_verify_run', 'invariance_run_verify');
+      return jsonResult(await client.get(`/v1/runs/${encodeURIComponent(id)}/verify`));
+    },
   );
 }
 
