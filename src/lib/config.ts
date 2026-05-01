@@ -16,11 +16,14 @@ export function loadConfig(): Config {
     );
   }
 
-  const baseUrl = (
-    process.env.INVARIANCE_API_URL ??
-    process.env.INVARIANCE_BASE_URL ??
-    DEFAULT_BASE_URL
-  ).replace(/\/+$/, '');
+  const apiUrl = process.env.INVARIANCE_API_URL;
+  const legacyBaseUrl = process.env.INVARIANCE_BASE_URL;
+  if (legacyBaseUrl && !apiUrl) {
+    process.stderr.write(
+      'warning: INVARIANCE_BASE_URL is deprecated; use INVARIANCE_API_URL instead.\n',
+    );
+  }
+  const baseUrl = (apiUrl ?? legacyBaseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
 
   const rawTransport = process.env.INVARIANCE_MCP_TRANSPORT ?? 'stdio';
   // 'sse' kept as an alias for back-compat with older configs.

@@ -23,7 +23,7 @@ npx @invariance/mcp
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `INVARIANCE_API_KEY` | Yes | — | Your Invariance API key |
-| `INVARIANCE_BASE_URL` | No | `https://api.invariance.ai` | API base URL |
+| `INVARIANCE_API_URL` | No | `https://api.useinvariance.com` | API base URL (deprecated alias: `INVARIANCE_BASE_URL`) |
 | `INVARIANCE_MCP_TRANSPORT` | No | `stdio` | Transport mode: `stdio` or `sse` |
 | `INVARIANCE_MCP_PORT` | No | `3000` | Port for SSE/HTTP transport |
 | `INVARIANCE_TIMEOUT` | No | `30000` | Request timeout in milliseconds |
@@ -148,7 +148,7 @@ Verify your API key is valid at [app.invariance.ai/settings/api-keys](https://ap
 
 ### Connection timeouts
 
-If using a custom `INVARIANCE_BASE_URL`, verify the URL is reachable.
+If using a custom `INVARIANCE_API_URL`, verify the URL is reachable.
 
 ## Contributing
 
