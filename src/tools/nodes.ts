@@ -37,8 +37,8 @@ export function registerNodeTools(server: McpServer, client: InvarianceClient): 
       if (m !== undefined) node.metadata = m;
       const cf = parseJsonArg('custom_fields', custom_fields);
       if (cf !== undefined) node.custom_fields = cf;
-      const res = await client.post<{ data: unknown[] }>('/v1/nodes', [node]);
-      return jsonResult(res.data[0]);
+      const data = await client.writeNodes(run_id, [node]);
+      return jsonResult(data[0]);
     },
   );
 

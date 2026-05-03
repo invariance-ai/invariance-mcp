@@ -44,6 +44,7 @@
   },
   "packageManager": "pnpm@9.15.4",
   "dependencies": {
+    "@invariance/sdk": "file:../invariance-typescript",
     "@modelcontextprotocol/sdk": "^1.12.1",
     "zod": "^4.3.6"
   },

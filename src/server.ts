@@ -20,7 +20,7 @@ export const SERVER_VERSION = '0.2.0';
 
 export function createServer(): McpServer {
   const config = loadConfig();
-  const client = new InvarianceClient(config.apiKey, config.baseUrl);
+  const client = new InvarianceClient(config.apiKey, config.baseUrl, config.signingKey);
 
   const server = new McpServer({
     name: SERVER_NAME,

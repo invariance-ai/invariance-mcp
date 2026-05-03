@@ -3,6 +3,9 @@ export interface Config {
   baseUrl: string;
   transport: 'stdio' | 'http';
   port: number;
+  /** Ed25519 private key (64 hex chars) used to sign run-create and node
+   *  writes. Required once the agent has a registered public_key. Env-only. */
+  signingKey?: string;
 }
 
 const DEFAULT_BASE_URL = 'https://api.useinvariance.com';
@@ -47,5 +50,7 @@ export function loadConfig(): Config {
     port = parsed;
   }
 
-  return { apiKey, baseUrl, transport, port };
+  const signingKey = process.env.INVARIANCE_SIGNING_KEY;
+
+  return { apiKey, baseUrl, transport, port, signingKey };
 }

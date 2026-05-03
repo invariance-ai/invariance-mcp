@@ -17,11 +17,11 @@ export function registerRunTools(server: McpServer, client: InvarianceClient): v
         ),
     },
     async ({ name, metadata }) => {
-      const body: Record<string, unknown> = {};
+      const body: { name?: string; metadata?: Record<string, unknown> } = {};
       if (name !== undefined) body.name = name;
       const meta = parseJsonArg('metadata', metadata);
-      if (meta !== undefined) body.metadata = meta;
-      const res = await client.post<{ run: unknown }>('/v1/runs', body);
+      if (meta !== undefined) body.metadata = meta as Record<string, unknown>;
+      const res = (await client.createRun(body)) as { run: unknown };
       return jsonResult(res.run);
     },
   );
