@@ -3,14 +3,14 @@ import { z } from 'zod';
 import type { InvarianceClient } from '../lib/client.js';
 import { jsonResult, parseJsonArg } from '../lib/util.js';
 
-const severityEnum = z.enum(['low', 'medium', 'high', 'critical']);
+const severityEnum = z.enum(['info', 'low', 'medium', 'high', 'critical']);
 
 export function registerSignalTools(server: McpServer, client: InvarianceClient): void {
   server.tool(
     'invariance_signal_emit',
-    'Emit a manual signal (alert/notification) — typically attached to a run/node and used to flag noteworthy events for review or downstream automation.',
+    'Emit a manual signal (alert/notification) — typically attached to a run/node and used to flag noteworthy events for review or downstream automation. severity defaults to "info" if omitted. run_id/node_id auto-fill from INVARIANCE_RUN_ID/INVARIANCE_NODE_ID env vars when present.',
     {
-      severity: severityEnum,
+      severity: severityEnum.optional().describe('Defaults to "info" when omitted.'),
       title: z.string().describe('Short headline for the signal (shown in dashboards).'),
       message: z.string().optional().describe('Longer human-readable description.'),
       type: z.string().optional().describe('Free-form signal category, e.g. "policy_violation", "cost_spike", "pii_leak".'),
@@ -20,17 +20,19 @@ export function registerSignalTools(server: McpServer, client: InvarianceClient)
         .describe(
           'Arbitrary signal payload as a JSON-encoded string (any JSON value). Example: {"observed_cost_usd":7.42,"threshold":5}',
         ),
-      run_id: z.string().optional().describe('Run this signal is associated with.'),
-      node_id: z.string().optional().describe('Specific node this signal is attached to (within run_id).'),
+      run_id: z.string().optional().describe('Run this signal is associated with. Falls back to $INVARIANCE_RUN_ID.'),
+      node_id: z.string().optional().describe('Specific node this signal is attached to (within run_id). Falls back to $INVARIANCE_NODE_ID.'),
     },
     async ({ severity, title, message, type, data, run_id, node_id }) => {
-      const body: Record<string, unknown> = { severity, title };
+      const body: Record<string, unknown> = { severity: severity ?? 'info', title };
       if (message !== undefined) body.message = message;
       if (type !== undefined) body.type = type;
       const d = parseJsonArg('data', data);
       if (d !== undefined) body.data = d;
-      if (run_id !== undefined) body.run_id = run_id;
-      if (node_id !== undefined) body.node_id = node_id;
+      const effectiveRunId = run_id ?? process.env.INVARIANCE_RUN_ID;
+      const effectiveNodeId = node_id ?? process.env.INVARIANCE_NODE_ID;
+      if (effectiveRunId) body.run_id = effectiveRunId;
+      if (effectiveNodeId) body.node_id = effectiveNodeId;
       const res = await client.post<{ signal: unknown }>('/v1/signals', body);
       return jsonResult(res.signal);
     },
