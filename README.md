@@ -24,11 +24,11 @@ npx @invariance/mcp
 |----------|----------|---------|-------------|
 | `INVARIANCE_API_KEY` | Yes | — | Your Invariance API key |
 | `INVARIANCE_API_URL` | No | `https://api.useinvariance.com` | API base URL (deprecated alias: `INVARIANCE_BASE_URL`) |
-| `INVARIANCE_MCP_TRANSPORT` | No | `stdio` | Transport mode: `stdio` or `sse` |
+| `INVARIANCE_MCP_TRANSPORT` | No | `stdio` | Transport mode: `stdio` or `http` (`sse` is accepted as a deprecated alias for `http`) |
 | `INVARIANCE_MCP_PORT` | No | `3000` | Port for SSE/HTTP transport |
 | `INVARIANCE_TIMEOUT` | No | `30000` | Request timeout in milliseconds |
 
-Get your API key at [app.invariance.ai/settings/api-keys](https://app.invariance.ai/settings/api-keys).
+Get your API key at [app.useinvariance.com/settings/api-keys](https://app.useinvariance.com/settings/api-keys).
 
 ### Claude Desktop
 
@@ -144,7 +144,7 @@ Make sure you've set the `INVARIANCE_API_KEY` environment variable in your MCP c
 
 ### Authentication errors
 
-Verify your API key is valid at [app.invariance.ai/settings/api-keys](https://app.invariance.ai/settings/api-keys).
+Verify your API key is valid at [app.useinvariance.com/settings/api-keys](https://app.useinvariance.com/settings/api-keys).
 
 ### Connection timeouts
 
