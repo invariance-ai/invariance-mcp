@@ -31,7 +31,7 @@ export function loadConfig(): Config {
     rawTransport === 'http' || rawTransport === 'sse' ? 'http' : 'stdio';
   if (rawTransport !== 'stdio' && rawTransport !== 'http' && rawTransport !== 'sse') {
     throw new Error(
-      `Invalid INVARIANCE_MCP_TRANSPORT: "${rawTransport}". Must be "stdio" or "http".`,
+      `Invalid INVARIANCE_MCP_TRANSPORT: "${rawTransport}". Must be "stdio" or "http" ("sse" is accepted as a deprecated alias for "http").`,
     );
   }
 
