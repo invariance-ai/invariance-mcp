@@ -6,7 +6,7 @@ import { createServer } from '../server.js';
 
 const API_URL = 'https://api.test';
 
-type Recorded = { method: string; path: string; body: unknown };
+type Recorded = { method: string; path: string; body: unknown; headers: Headers };
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -83,7 +83,12 @@ beforeEach(async () => {
     const url = new URL(String(input));
     const method = init?.method ?? 'GET';
     const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
-    requests.push({ method, path: `${url.pathname}${url.search}`, body });
+    requests.push({
+      method,
+      path: `${url.pathname}${url.search}`,
+      body,
+      headers: new Headers(init?.headers),
+    });
 
     if (method === 'POST' && url.pathname === '/v1/runs') {
       return json({ run: { ...runFixture(), name: body?.name ?? 'demo' } }, 201);
@@ -228,7 +233,7 @@ describe('Invariance MCP server', () => {
     ) as { id: string; name: string };
     expect(result.id).toBe('run_1');
     expect(result.name).toBe('demo');
-    expect(requests[0]).toEqual({
+    expect(requests[0]).toMatchObject({
       method: 'POST',
       path: '/v1/runs',
       body: { name: 'demo' },
@@ -277,6 +282,7 @@ describe('Invariance MCP server', () => {
       data: { p99_ms: 2400 },
       run_id: 'run_1',
     });
+    expect(call?.headers.get('Idempotency-Key')).toMatch(/^[A-Za-z0-9_-]+/);
   });
 
   it('returns the authenticated agent via invariance_agent_me', async () => {
