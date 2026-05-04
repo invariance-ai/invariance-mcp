@@ -30,6 +30,13 @@ function backoff(attempt: number, retryAfterSec?: number): number {
 const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
+function idempotencyKey(): string {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  let out = '';
+  for (let i = 0; i < 32; i++) out += Math.floor(Math.random() * 16).toString(16);
+  return out;
+}
+
 export type Query = Record<string, string | number | boolean | undefined | null>;
 
 export class InvarianceClient {
@@ -58,6 +65,8 @@ export class InvarianceClient {
       }
     }
     const timeoutMs = getTimeoutMs();
+    const headers = { ...this.headers };
+    if (method !== 'GET') headers['Idempotency-Key'] = idempotencyKey();
 
     let lastErr: unknown;
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -67,7 +76,7 @@ export class InvarianceClient {
       try {
         response = await fetch(url.toString(), {
           method,
-          headers: this.headers,
+          headers,
           body: body !== undefined ? JSON.stringify(body) : undefined,
           signal: controller.signal,
         });
