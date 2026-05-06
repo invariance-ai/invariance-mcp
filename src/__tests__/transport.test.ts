@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AddressInfo } from 'node:net';
-import { createServer as createHttpServer, type Server } from 'node:http';
+import { createServer as createHttpServer } from 'node:http';
 import { connectHttp } from '../transport.js';
 import { createServer } from '../server.js';
 
