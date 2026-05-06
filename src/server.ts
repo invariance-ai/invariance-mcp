@@ -14,9 +14,10 @@ import { registerFindingTools } from './tools/findings.js';
 import { registerReviewTools } from './tools/reviews.js';
 import { registerAgentTools } from './tools/agents.js';
 import { registerInsightTools } from './tools/insights.js';
+import { registerOperationalTools } from './tools/operational.js';
 
 export const SERVER_NAME = 'invariance';
-export const SERVER_VERSION = '0.2.0';
+export const SERVER_VERSION = '0.3.0';
 
 export function createServer(): McpServer {
   const config = loadConfig();
@@ -35,6 +36,7 @@ export function createServer(): McpServer {
   registerReviewTools(server, client);
   registerAgentTools(server, client);
   registerInsightTools(server, client);
+  registerOperationalTools(server, client);
   registerLegacyAliases(server, client);
 
   return server;
