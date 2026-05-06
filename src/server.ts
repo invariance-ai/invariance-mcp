@@ -18,9 +18,21 @@ import { registerInsightTools } from './tools/insights.js';
 export const SERVER_NAME = 'invariance';
 export const SERVER_VERSION = '0.2.0';
 
-export function createServer(): McpServer {
-  const config = loadConfig();
-  const client = new InvarianceClient(config.apiKey, config.baseUrl);
+export interface CreateServerOptions {
+  /**
+   * Override the API key. When unset, falls back to INVARIANCE_API_KEY via
+   * loadConfig(). Used by the HTTP transport to bind a per-request bearer
+   * token to a server instance, so a hosted MCP can serve multiple tenants.
+   */
+  apiKey?: string;
+  baseUrl?: string;
+}
+
+export function createServer(options: CreateServerOptions = {}): McpServer {
+  const config = loadConfig({ requireApiKey: options.apiKey === undefined });
+  const apiKey = options.apiKey ?? config.apiKey;
+  const baseUrl = options.baseUrl ?? config.baseUrl;
+  const client = new InvarianceClient(apiKey, baseUrl);
 
   const server = new McpServer({
     name: SERVER_NAME,
@@ -132,9 +144,14 @@ function registerLegacyAliases(server: McpServer, client: InvarianceClient): voi
 }
 
 export async function startServer(): Promise<void> {
-  const config = loadConfig();
+  // HTTP transport authenticates each session from the request's Bearer
+  // header rather than from a process-wide env key, so we don't require
+  // INVARIANCE_API_KEY at boot for that mode.
+  const httpMode = (process.env.INVARIANCE_MCP_TRANSPORT === 'http' ||
+    process.env.INVARIANCE_MCP_TRANSPORT === 'sse');
+  const config = loadConfig({ requireApiKey: !httpMode });
   if (config.transport === 'http') {
-    await connectHttp(() => createServer(), config.port);
+    await connectHttp((apiKey) => createServer({ apiKey }), config.port);
     return;
   }
   const server = createServer();

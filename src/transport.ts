@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer';
-import { createServer as createHttpServer, type IncomingMessage } from 'node:http';
+import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -35,13 +35,44 @@ function getSessionId(req: IncomingMessage): string | undefined {
   return typeof header === 'string' ? header : undefined;
 }
 
+function getBearerToken(req: IncomingMessage): string | undefined {
+  const raw = req.headers['authorization'];
+  if (typeof raw !== 'string') return undefined;
+  const m = /^Bearer\s+(.+)$/i.exec(raw.trim());
+  return m ? m[1].trim() : undefined;
+}
+
+function jsonError(res: ServerResponse, status: number, code: number, message: string): void {
+  res.writeHead(status, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({
+    jsonrpc: '2.0',
+    error: { code, message },
+    id: null,
+  }));
+}
+
+/**
+ * HTTP transport.
+ *
+ * Each MCP session is bound to the bearer token from the initialize request.
+ * That token is passed through to `createServer(apiKey)` so the underlying
+ * InvarianceClient calls land as the requesting tenant rather than as a
+ * shared process-wide env key. This is what lets a hosted MCP serve multiple
+ * customers without leaking writes across them.
+ *
+ * Token rules:
+ *   - Initialize POST (no `mcp-session-id`): must carry `Authorization: Bearer …`.
+ *   - Subsequent requests: identified by `mcp-session-id`; the bearer header
+ *     is not re-checked (the session id is the capability), but if it IS sent
+ *     it must match the token bound to that session.
+ */
 export async function connectHttp(
-  createServer: () => McpServer,
+  createServer: (apiKey: string) => McpServer,
   port: number,
 ): Promise<void> {
-  const transports = new Map<
+  const sessions = new Map<
     string,
-    { server: McpServer; transport: StreamableHTTPServerTransport }
+    { server: McpServer; transport: StreamableHTTPServerTransport; apiKey: string }
   >();
 
   const httpServer = createHttpServer(async (req, res) => {
@@ -58,43 +89,47 @@ export async function connectHttp(
           const sessionId = getSessionId(req);
 
           if (sessionId) {
-            const existing = transports.get(sessionId);
+            const existing = sessions.get(sessionId);
             if (!existing) {
-              res.writeHead(404, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({
-                jsonrpc: '2.0',
-                error: { code: -32001, message: 'Unknown MCP session' },
-                id: null,
-              }));
+              jsonError(res, 404, -32001, 'Unknown MCP session');
               return;
             }
-
+            // Optional defense-in-depth: if the client re-sends a bearer,
+            // verify it matches the one bound at initialize. Missing header
+            // is fine — the session id itself is the capability.
+            const tok = getBearerToken(req);
+            if (tok !== undefined && tok !== existing.apiKey) {
+              jsonError(res, 401, -32002, 'Bearer does not match MCP session');
+              return;
+            }
             await existing.transport.handleRequest(req, res, parsedBody);
             return;
           }
 
           if (!isInitializeRequest(parsedBody)) {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({
-              jsonrpc: '2.0',
-              error: { code: -32000, message: 'Missing MCP session for non-initialize request' },
-              id: null,
-            }));
+            jsonError(res, 400, -32000, 'Missing MCP session for non-initialize request');
             return;
           }
 
-          const server = createServer();
+          const apiKey = getBearerToken(req);
+          if (!apiKey) {
+            res.setHeader('WWW-Authenticate', 'Bearer realm="invariance-mcp"');
+            jsonError(res, 401, -32002, 'Missing Authorization: Bearer <api-key> header');
+            return;
+          }
+
+          const server = createServer(apiKey);
           const transport = new StreamableHTTPServerTransport({
             sessionIdGenerator: () => randomUUID(),
             onsessioninitialized: (initializedSessionId) => {
-              transports.set(initializedSessionId, { server, transport });
+              sessions.set(initializedSessionId, { server, transport, apiKey });
             },
           });
 
           transport.onclose = () => {
             const activeSessionId = transport.sessionId;
             if (activeSessionId) {
-              transports.delete(activeSessionId);
+              sessions.delete(activeSessionId);
             }
           };
 
@@ -106,23 +141,13 @@ export async function connectHttp(
         if (req.method === 'GET' || req.method === 'DELETE') {
           const sessionId = getSessionId(req);
           if (!sessionId) {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({
-              jsonrpc: '2.0',
-              error: { code: -32000, message: 'Missing MCP session header' },
-              id: null,
-            }));
+            jsonError(res, 400, -32000, 'Missing MCP session header');
             return;
           }
 
-          const existing = transports.get(sessionId);
+          const existing = sessions.get(sessionId);
           if (!existing) {
-            res.writeHead(404, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({
-              jsonrpc: '2.0',
-              error: { code: -32001, message: 'Unknown MCP session' },
-              id: null,
-            }));
+            jsonError(res, 404, -32001, 'Unknown MCP session');
             return;
           }
 
@@ -134,12 +159,7 @@ export async function connectHttp(
         res.end('Method not allowed');
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Invalid request';
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-          jsonrpc: '2.0',
-          error: { code: -32700, message },
-          id: null,
-        }));
+        jsonError(res, 400, -32700, message);
       }
       return;
     }

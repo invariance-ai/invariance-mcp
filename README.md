@@ -123,12 +123,18 @@ The original 6 tool names from earlier versions are kept as aliases so existing 
 To run the server over Streamable HTTP instead of stdio:
 
 ```bash
-INVARIANCE_API_KEY=your-api-key INVARIANCE_MCP_TRANSPORT=http INVARIANCE_MCP_PORT=3000 npx @invariance/mcp
+INVARIANCE_MCP_TRANSPORT=http INVARIANCE_MCP_PORT=3000 npx @invariance/mcp
 ```
 
 The server exposes a Streamable HTTP endpoint at `http://127.0.0.1:3000/mcp` and a health check at `http://127.0.0.1:3000/health`.
 
-MCP clients that support HTTP transport can connect using the `/mcp` endpoint URL instead of spawning a subprocess.
+#### Authentication (HTTP)
+
+Unlike stdio (which reads `INVARIANCE_API_KEY` from the environment, single-tenant), the HTTP transport authenticates **per session** from the client request. Each MCP client must send its own API key in the `Authorization: Bearer …` header on the `initialize` request. That key is bound to the resulting session and used for every tool call made through that session.
+
+This means a single hosted MCP server can serve multiple distinct customers; each connecting client provides its own bearer and only sees data scoped to that key. `INVARIANCE_API_KEY` is **not required** in the environment for HTTP mode.
+
+MCP clients that support HTTP transport can connect using the `/mcp` endpoint URL with their own API key as the bearer.
 
 ## Troubleshooting
 

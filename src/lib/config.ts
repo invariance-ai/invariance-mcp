@@ -7,9 +7,20 @@ export interface Config {
 
 const DEFAULT_BASE_URL = 'https://api.useinvariance.com';
 
-export function loadConfig(): Config {
-  const apiKey = process.env.INVARIANCE_API_KEY;
-  if (!apiKey) {
+export interface LoadConfigOptions {
+  /**
+   * When false, the loader does not require INVARIANCE_API_KEY in the
+   * environment. The HTTP transport sets this so it can bind per-request
+   * bearer tokens to per-session server instances instead of a process-wide
+   * env key.
+   */
+  requireApiKey?: boolean;
+}
+
+export function loadConfig(options: LoadConfigOptions = {}): Config {
+  const requireApiKey = options.requireApiKey ?? true;
+  const apiKey = process.env.INVARIANCE_API_KEY ?? '';
+  if (requireApiKey && !apiKey) {
     throw new Error(
       'INVARIANCE_API_KEY environment variable is required. ' +
         'Get your API key at https://app.useinvariance.com/settings/api-keys',
@@ -20,7 +31,8 @@ export function loadConfig(): Config {
   const legacyBaseUrl = process.env.INVARIANCE_BASE_URL;
   if (legacyBaseUrl && !apiUrl) {
     process.stderr.write(
-      'warning: INVARIANCE_BASE_URL is deprecated; use INVARIANCE_API_URL instead.\n',
+      'warning: INVARIANCE_BASE_URL is deprecated; use INVARIANCE_API_URL instead. ' +
+        'Support for INVARIANCE_BASE_URL will be removed on 2026-08-01.\n',
     );
   }
   const baseUrl = (apiUrl ?? legacyBaseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
