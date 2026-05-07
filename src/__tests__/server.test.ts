@@ -115,6 +115,60 @@ beforeEach(async () => {
     if (method === 'GET' && url.pathname === '/v1/runs/run_1/nodes') {
       return json({ data: [nodeFixture()], next_cursor: null });
     }
+    if (method === 'GET' && url.pathname === '/v1/runs/run_1/operational-graph') {
+      return json({
+        run_id: 'run_1',
+        nodes: [{ id: 'node_1' }],
+        edges: [],
+        root_node_ids: ['node_1'],
+      });
+    }
+    if (method === 'GET' && url.pathname === '/v1/runs/run_1/llm-calls') {
+      return json({
+        data: [{ id: 'llm_1', node_id: 'node_1', model: 'claude-opus-4-7' }],
+        next_cursor: null,
+      });
+    }
+    if (method === 'GET' && url.pathname === '/v1/runs/run_1/node-types') {
+      return json({ data: [{ type: 'tool_call', count: 3 }] });
+    }
+    if (method === 'GET' && url.pathname === '/v1/runs/run_1/node-types/tool_call/metrics') {
+      return json({ metrics: { type: 'tool_call', count: 3 } });
+    }
+    if (method === 'POST' && url.pathname === '/v1/runs/run_1/fork') {
+      return json(
+        {
+          run: {
+            ...runFixture('run_2'),
+            metadata: { fork_from: body?.from_node_id, ...(body?.metadata ?? {}) },
+            name: body?.name ?? 'demo',
+          },
+        },
+        201,
+      );
+    }
+    if (method === 'GET' && url.pathname.startsWith('/v1/metrics/overview')) {
+      return json({ metrics: { runs: 1, nodes: 1, errors: 0, window_hours: 24 } });
+    }
+    if (method === 'GET' && url.pathname.startsWith('/v1/metrics/agents')) {
+      return json({ usage: [{ agent_id: 'agent_1', runs: 1 }] });
+    }
+    if (method === 'GET' && url.pathname === '/v1/runs/run_1/metrics') {
+      return json({ metrics: { llm_call_count: 1, tool_call_count: 0 } });
+    }
+    if (method === 'GET' && url.pathname === '/v1/runs/run_1/narrative') {
+      return json({ narrative: { summary: 'all good', sections: [] } });
+    }
+    if (method === 'GET' && url.pathname.startsWith('/v1/findings')) {
+      return json({
+        data: [
+          { id: 'find_1', run_id: 'run_1', status: 'open', title: 'spike' },
+          { id: 'find_2', run_id: 'run_other', status: 'open', title: 'other' },
+          { id: 'find_3', run_id: 'run_1', status: 'resolved', title: 'old' },
+        ],
+        next_cursor: null,
+      });
+    }
     if (method === 'POST' && url.pathname === '/v1/nodes') {
       return json({ data: [nodeFixture()] }, 201);
     }
@@ -208,6 +262,10 @@ describe('Invariance MCP server', () => {
       'invariance_review_unclaim', 'invariance_review_resolve',
       'invariance_agent_me', 'invariance_agent_set_key',
       'invariance_narrative_get', 'invariance_ask',
+      'invariance_run_operational_graph', 'invariance_run_llm_calls',
+      'invariance_run_node_types', 'invariance_run_node_type_metrics',
+      'invariance_run_fork', 'invariance_metrics_overview',
+      'invariance_metrics_agents', 'invariance_run_inspect',
       'invariance_kb_pages_list', 'invariance_kb_page_get',
       'invariance_kb_page_create', 'invariance_kb_page_update', 'invariance_kb_page_delete',
       'invariance_kb_session_create', 'invariance_kb_session_delete',
@@ -367,6 +425,107 @@ describe('Invariance MCP server', () => {
     expect(
       requests.some((r) => r.method === 'DELETE' && r.path === '/v1/kb/pages/page_1'),
     ).toBe(true);
+  });
+
+  it('returns a structured API_NOT_AVAILABLE result for operational graph', async () => {
+    const result = contentJson(
+      await client.callTool({
+        name: 'invariance_run_operational_graph',
+        arguments: { run_id: 'run_1' },
+      }),
+    ) as { error: { code: string; retryable: boolean } };
+    expect(result.error.code).toBe('API_NOT_AVAILABLE');
+    expect(result.error.retryable).toBe(false);
+    expect(
+      requests.some((r) => r.path === '/v1/runs/run_1/operational-graph'),
+    ).toBe(false);
+  });
+
+  it('lists llm calls for a run with pagination args', async () => {
+    const result = contentJson(
+      await client.callTool({
+        name: 'invariance_run_llm_calls',
+        arguments: { run_id: 'run_1', limit: 25 },
+      }),
+    ) as { data: unknown[] };
+    expect(result.data.length).toBe(1);
+    const call = requests.find(
+      (r) => r.method === 'GET' && r.path.startsWith('/v1/runs/run_1/llm-calls'),
+    );
+    expect(call?.path).toContain('limit=25');
+  });
+
+  it('fetches node-type aggregate and per-type metrics', async () => {
+    const types = contentJson(
+      await client.callTool({
+        name: 'invariance_run_node_types',
+        arguments: { run_id: 'run_1' },
+      }),
+    ) as { data: Array<{ type: string }> };
+    expect(types.data[0]?.type).toBe('tool_call');
+
+    const metrics = contentJson(
+      await client.callTool({
+        name: 'invariance_run_node_type_metrics',
+        arguments: { run_id: 'run_1', type: 'tool_call' },
+      }),
+    ) as { metrics: { type: string } };
+    expect(metrics.metrics.type).toBe('tool_call');
+  });
+
+  it('forks a run', async () => {
+    const result = contentJson(
+      await client.callTool({
+        name: 'invariance_run_fork',
+        arguments: { id: 'run_1', from_node_id: 'node_1', name: 'fork-test' },
+      }),
+    ) as { id: string; name: string };
+    expect(result.id).toBe('run_2');
+    expect(result.name).toBe('fork-test');
+    const call = requests.find(
+      (r) => r.method === 'POST' && r.path === '/v1/runs/run_1/fork',
+    );
+    expect(call?.body).toEqual({ from_node_id: 'node_1', name: 'fork-test' });
+  });
+
+  it('fetches cross-run metrics overview and agent usage', async () => {
+    const overview = contentJson(
+      await client.callTool({
+        name: 'invariance_metrics_overview',
+        arguments: { window_hours: 6 },
+      }),
+    ) as { metrics: { window_hours: number } };
+    expect(overview.metrics.window_hours).toBe(24);
+    const overviewCall = requests.find((r) => r.path.startsWith('/v1/metrics/overview'));
+    expect(overviewCall?.path).toContain('window_hours=6');
+
+    const agents = contentJson(
+      await client.callTool({
+        name: 'invariance_metrics_agents',
+        arguments: {},
+      }),
+    ) as { usage: unknown[] };
+    expect(agents.usage.length).toBe(1);
+  });
+
+  it('returns a composite triage view via invariance_run_inspect', async () => {
+    const result = contentJson(
+      await client.callTool({
+        name: 'invariance_run_inspect',
+        arguments: { id: 'run_1', limit: 10 },
+      }),
+    ) as {
+      run: { id?: string } | null;
+      metrics: { metrics?: unknown } | null;
+      narrative: { summary?: string } | null;
+      recent_nodes: unknown[];
+      open_findings: Array<{ id: string }>;
+    };
+    expect(result.run?.id).toBe('run_1');
+    expect(result.narrative?.summary).toBe('all good');
+    expect(result.recent_nodes.length).toBe(1);
+    // open_findings filters to status=open AND run_id=run_1
+    expect(result.open_findings.map((f) => f.id)).toEqual(['find_1']);
   });
 
   it('keeps legacy tool names working', async () => {
