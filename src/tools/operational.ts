@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { InvarianceClient } from '../lib/client.js';
-import { apiNotAvailableResult, jsonResult, parseJsonArg } from '../lib/util.js';
+import { jsonResult, parseJsonArg } from '../lib/util.js';
 
 export function registerOperationalTools(
   server: McpServer,
@@ -9,14 +9,13 @@ export function registerOperationalTools(
 ): void {
   server.tool(
     'invariance_run_operational_graph',
-    'Get the operational graph for a run. Stub: returns structured API_NOT_AVAILABLE until the platform exposes /v1/runs/:id/operational-graph.',
+    'Get the operational graph for a run — entities, edges, findings, and a completeness score (business_object_linked, policy_context_found, owner_found, approval_context_found, downstream_state_change_found).',
     {
       run_id: z.string().describe('Run ID, e.g. "run_abc123".'),
     },
-    async () =>
-      apiNotAvailableResult(
-        'invariance_run_operational_graph',
-        '/v1/runs/:id/operational-graph is not on the platform API yet',
+    async ({ run_id }) =>
+      jsonResult(
+        await client.get(`/v1/runs/${encodeURIComponent(run_id)}/operational-graph`),
       ),
   );
 
