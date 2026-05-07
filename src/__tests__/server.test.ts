@@ -260,6 +260,72 @@ beforeEach(async () => {
     if (method === 'POST' && url.pathname === '/v1/kb/sessions/sess_1/messages') {
       return json({ message: { id: 'msg_2', ...body } }, 201);
     }
+    if (method === 'POST' && url.pathname === '/v1/memory/read') {
+      return json({
+        access: {
+          id: 'mem_acc_1',
+          run_id: body?.run_id ?? 'run_1',
+          node_id: body?.node_id ?? 'node_1',
+          agent_id: 'agent_1',
+          access_type: 'read',
+          subject_type: body?.subject_type,
+          subject_id: body?.subject_id,
+          key: body?.key,
+          value: 'email',
+          used_for: body?.used_for,
+          source_node_id: null,
+          timestamp: '2026-05-07T12:00:00Z',
+        },
+        record: {
+          id: 'mem_1',
+          agent_id: 'agent_1',
+          subject_type: body?.subject_type,
+          subject_id: body?.subject_id,
+          claim: body?.key,
+          value: 'email',
+          source: 'agent_write',
+          confidence: 1.0,
+          valid_from: '2026-05-07T12:00:00Z',
+          valid_until: null,
+          last_verified_at: null,
+          superseded_by: null,
+          provenance: [],
+        },
+      });
+    }
+    if (method === 'POST' && url.pathname === '/v1/memory/write') {
+      return json({
+        access: {
+          id: 'mem_acc_2',
+          run_id: body?.run_id ?? null,
+          node_id: body?.node_id ?? null,
+          agent_id: 'agent_1',
+          access_type: 'write',
+          subject_type: body?.subject_type,
+          subject_id: body?.subject_id,
+          key: body?.key,
+          value: body?.value,
+          used_for: body?.used_for,
+          source_node_id: null,
+          timestamp: '2026-05-07T12:00:00Z',
+        },
+        record: {
+          id: 'mem_2',
+          agent_id: 'agent_1',
+          subject_type: body?.subject_type,
+          subject_id: body?.subject_id,
+          claim: body?.key,
+          value: body?.value,
+          source: body?.source,
+          confidence: body?.confidence,
+          valid_from: '2026-05-07T12:00:00Z',
+          valid_until: body?.valid_until ?? null,
+          last_verified_at: null,
+          superseded_by: null,
+          provenance: body?.provenance ?? [],
+        },
+      });
+    }
 
     return json(
       { error: { code: 'not_found', message: `${method} ${url.pathname}` } },
@@ -310,6 +376,7 @@ describe('Invariance MCP server', () => {
       'invariance_kb_page_create', 'invariance_kb_page_update', 'invariance_kb_page_delete',
       'invariance_kb_session_create', 'invariance_kb_session_delete',
       'invariance_kb_session_list_messages', 'invariance_kb_session_append_message',
+      'invariance_memory_read', 'invariance_memory_write',
     ]) {
       expect(names.has(expected), `missing tool ${expected}`).toBe(true);
     }
@@ -605,6 +672,66 @@ describe('Invariance MCP server', () => {
     expect(result.recent_nodes.length).toBe(1);
     // open_findings filters to status=open AND run_id=run_1
     expect(result.open_findings.map((f) => f.id)).toEqual(['find_1']);
+  });
+
+  it('records a memory read via invariance_memory_read', async () => {
+    const result = contentJson(
+      await client.callTool({
+        name: 'invariance_memory_read',
+        arguments: {
+          run_id: 'run_1',
+          node_id: 'node_1',
+          subject_type: 'customer',
+          subject_id: 'cust_42',
+          key: 'preferred_contact_channel',
+          used_for: 'select-channel',
+        },
+      }),
+    ) as { access: { access_type: string }; record: { id: string } | null };
+    expect(result.access.access_type).toBe('read');
+    expect(result.record?.id).toBe('mem_1');
+    const call = requests.find(
+      (r) => r.method === 'POST' && r.path === '/v1/memory/read',
+    );
+    expect(call?.body).toEqual({
+      run_id: 'run_1',
+      node_id: 'node_1',
+      subject_type: 'customer',
+      subject_id: 'cust_42',
+      key: 'preferred_contact_channel',
+      used_for: 'select-channel',
+    });
+  });
+
+  it('records a memory write with default source/confidence', async () => {
+    const result = contentJson(
+      await client.callTool({
+        name: 'invariance_memory_write',
+        arguments: {
+          run_id: 'run_1',
+          node_id: 'node_1',
+          subject_type: 'customer',
+          subject_id: 'cust_42',
+          key: 'preferred_contact_channel',
+          value: '"email"',
+          used_for: 'remember',
+        },
+      }),
+    ) as { record: { source: string; confidence: number; value: unknown } };
+    expect(result.record.source).toBe('agent_write');
+    expect(result.record.confidence).toBe(1.0);
+    expect(result.record.value).toBe('email');
+    const call = requests.find(
+      (r) => r.method === 'POST' && r.path === '/v1/memory/write',
+    );
+    expect(call?.body).toMatchObject({
+      subject_type: 'customer',
+      subject_id: 'cust_42',
+      key: 'preferred_contact_channel',
+      value: 'email',
+      source: 'agent_write',
+      confidence: 1.0,
+    });
   });
 
   it('keeps legacy tool names working', async () => {
