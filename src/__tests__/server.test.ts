@@ -197,6 +197,45 @@ beforeEach(async () => {
         },
       });
     }
+    if (method === 'POST' && url.pathname === '/v1/agents') {
+      return json(
+        {
+          agent: {
+            id: 'agent_new',
+            name: body?.name ?? 'untitled',
+            public_key: body?.public_key ?? null,
+            project_id: body?.project_id ?? 'p1',
+            created_at: '2026-01-01T00:00:00.000Z',
+          },
+        },
+        201,
+      );
+    }
+    if (method === 'GET' && url.pathname === '/v1/agents') {
+      return json({
+        data: [
+          {
+            id: 'agent_1',
+            name: 'me',
+            public_key: null,
+            project_id: 'p1',
+            created_at: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+        next_cursor: null,
+      });
+    }
+    if (method === 'GET' && url.pathname === '/v1/agents/agent_1') {
+      return json({
+        agent: {
+          id: 'agent_1',
+          name: 'me',
+          public_key: null,
+          project_id: 'p1',
+          created_at: '2026-01-01T00:00:00.000Z',
+        },
+      });
+    }
     if (method === 'GET' && url.pathname === '/v1/runs/missing') {
       return json({ error: { code: 'not_found', message: 'Run missing not found' } }, 404);
     }
@@ -261,6 +300,7 @@ describe('Invariance MCP server', () => {
       'invariance_review_list', 'invariance_review_get', 'invariance_review_claim',
       'invariance_review_unclaim', 'invariance_review_resolve',
       'invariance_agent_me', 'invariance_agent_set_key',
+      'invariance_agent_create', 'invariance_agent_list', 'invariance_agent_get',
       'invariance_narrative_get', 'invariance_ask',
       'invariance_run_operational_graph', 'invariance_run_llm_calls',
       'invariance_run_node_types', 'invariance_run_node_type_metrics',
@@ -350,6 +390,43 @@ describe('Invariance MCP server', () => {
     expect(result.agent?.id).toBe('agent_1');
   });
 
+  it('creates an agent via invariance_agent_create', async () => {
+    const result = contentJson(
+      await client.callTool({
+        name: 'invariance_agent_create',
+        arguments: { name: 'new-bot', project_id: 'p1' },
+      }),
+    ) as { agent: { id: string; name: string; project_id: string } };
+    expect(result.agent.id).toBe('agent_new');
+    expect(result.agent.name).toBe('new-bot');
+    const call = requests.find((r) => r.method === 'POST' && r.path === '/v1/agents');
+    expect(call?.body).toEqual({ name: 'new-bot', project_id: 'p1' });
+  });
+
+  it('lists agents via invariance_agent_list with project_id', async () => {
+    const result = contentJson(
+      await client.callTool({
+        name: 'invariance_agent_list',
+        arguments: { project_id: 'p1' },
+      }),
+    ) as { data: Array<{ id: string }> };
+    expect(result.data.length).toBe(1);
+    const call = requests.find(
+      (r) => r.method === 'GET' && r.path.startsWith('/v1/agents?'),
+    );
+    expect(call?.path).toContain('project_id=p1');
+  });
+
+  it('fetches a single agent via invariance_agent_get', async () => {
+    const result = contentJson(
+      await client.callTool({
+        name: 'invariance_agent_get',
+        arguments: { id: 'agent_1' },
+      }),
+    ) as { id: string };
+    expect(result.id).toBe('agent_1');
+  });
+
   it('finishes a run via invariance_run_finish', async () => {
     const result = contentJson(
       await client.callTool({
@@ -427,18 +504,20 @@ describe('Invariance MCP server', () => {
     ).toBe(true);
   });
 
-  it('returns a structured API_NOT_AVAILABLE result for operational graph', async () => {
+  it('fetches the operational graph for a run', async () => {
     const result = contentJson(
       await client.callTool({
         name: 'invariance_run_operational_graph',
         arguments: { run_id: 'run_1' },
       }),
-    ) as { error: { code: string; retryable: boolean } };
-    expect(result.error.code).toBe('API_NOT_AVAILABLE');
-    expect(result.error.retryable).toBe(false);
+    ) as { run_id: string; nodes: unknown[]; edges: unknown[] };
+    expect(result.run_id).toBe('run_1');
+    expect(result.nodes).toHaveLength(1);
     expect(
-      requests.some((r) => r.path === '/v1/runs/run_1/operational-graph'),
-    ).toBe(false);
+      requests.some(
+        (r) => r.method === 'GET' && r.path === '/v1/runs/run_1/operational-graph',
+      ),
+    ).toBe(true);
   });
 
   it('lists llm calls for a run with pagination args', async () => {
