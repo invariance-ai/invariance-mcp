@@ -5,7 +5,7 @@
 ### Added
 
 - Operational debugging tools for agents working against a run:
-  - `invariance_run_operational_graph` — node-level DAG (`/v1/runs/:id/operational-graph`).
+  - `invariance_run_operational_graph` — structured `API_NOT_AVAILABLE` stub until `/v1/runs/:id/operational-graph` lands.
   - `invariance_run_llm_calls` — paginated LLM-call list for a run.
   - `invariance_run_node_types`, `invariance_run_node_type_metrics` — typed-node aggregates.
   - `invariance_run_fork` — branch a run from a node for replay / what-if.

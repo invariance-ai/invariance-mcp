@@ -421,20 +421,18 @@ describe('Invariance MCP server', () => {
     ).toBe(true);
   });
 
-  it('fetches the operational graph for a run', async () => {
+  it('returns a structured API_NOT_AVAILABLE result for operational graph', async () => {
     const result = contentJson(
       await client.callTool({
         name: 'invariance_run_operational_graph',
         arguments: { run_id: 'run_1' },
       }),
-    ) as { run_id: string; nodes: unknown[] };
-    expect(result.run_id).toBe('run_1');
-    expect(Array.isArray(result.nodes)).toBe(true);
+    ) as { error: { code: string; retryable: boolean } };
+    expect(result.error.code).toBe('API_NOT_AVAILABLE');
+    expect(result.error.retryable).toBe(false);
     expect(
-      requests.some(
-        (r) => r.method === 'GET' && r.path === '/v1/runs/run_1/operational-graph',
-      ),
-    ).toBe(true);
+      requests.some((r) => r.path === '/v1/runs/run_1/operational-graph'),
+    ).toBe(false);
   });
 
   it('lists llm calls for a run with pagination args', async () => {

@@ -13,4 +13,18 @@ export function jsonResult(value: unknown) {
   };
 }
 
+export function apiNotAvailableResult(tool: string, detail?: string) {
+  return jsonResult({
+    error: {
+      code: 'API_NOT_AVAILABLE',
+      message: `\`${tool}\` is defined but the backend endpoint is not available yet${
+        detail ? `: ${detail}` : '.'
+      }`,
+      retryable: false,
+      suggested_fix:
+        'Track platform progress at https://invariance.ai/changelog or contact support@invariance.ai.',
+    },
+  });
+}
+
 export type PageOpts = { cursor?: string; limit?: number };
