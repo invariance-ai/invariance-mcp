@@ -86,13 +86,13 @@ Add to your Cursor MCP settings (`.cursor/mcp.json`):
 
 ## Available tools
 
-The server exposes **45 tools** covering Invariance API workflows. Names follow `invariance_<resource>_<action>`.
+The server exposes **58 tools** covering Invariance API workflows. Names follow `invariance_<resource>_<action>`.
 
 **Runs** (`invariance_run_*`)
 `start`, `get`, `list`, `finish`, `fail`, `verify`, `metrics`, `operational_graph`, `llm_calls`, `node_types`, `node_type_metrics`, `fork`, `inspect`
 
 **Nodes** (`invariance_node_*`)
-`write`, `list`
+`write`, `list`, `type_register`
 
 **Monitors** (`invariance_monitor_*`)
 `create`, `list`, `get`, `update`, `pause`, `resume`, `evaluate`, `executions`, `findings`
@@ -107,10 +107,13 @@ The server exposes **45 tools** covering Invariance API workflows. Names follow 
 `list`, `get`, `claim`, `unclaim`, `resolve`
 
 **Agents** (`invariance_agent_*`)
-`me`, `set_key`
+`me`, `set_key`, `create`, `list`, `get`
 
 **Insights**
-`invariance_narrative_get` (LLM-synthesized run summary), `invariance_ask` (turn-based Q&A over your KB + runs), `invariance_kb_pages_list`, `invariance_kb_page_get`
+`invariance_narrative_get` (LLM-synthesized run summary), `invariance_ask` (turn-based Q&A over your KB + runs), `invariance_kb_pages_list`, `invariance_kb_page_get`, `invariance_kb_page_create`, `invariance_kb_page_update`, `invariance_kb_page_delete`, `invariance_kb_session_create`, `invariance_kb_session_delete`, `invariance_kb_session_list_messages`, `invariance_kb_session_append_message`
+
+**Memory** (`invariance_memory_*`)
+`read`, `write` — cross-run memory primitives.
 
 **Operational debugging** — agent-friendly views over runs.
 `invariance_run_operational_graph` (stub: structured `API_NOT_AVAILABLE` until the platform endpoint lands), `invariance_run_llm_calls` (paginated LLM calls for a run), `invariance_run_node_types` / `invariance_run_node_type_metrics` (typed-node aggregates), `invariance_run_fork` (branch a run from a node for replay/what-if), `invariance_run_inspect` (composite triage view: run + metrics + narrative + recent nodes + open findings, mirrors `inv run inspect`).
