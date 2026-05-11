@@ -5,6 +5,13 @@ import { jsonResult } from '../lib/util.js';
 
 export function registerAgentTools(server: McpServer, client: InvarianceClient): void {
   server.tool(
+    'invariance_operator_me',
+    'Show the operator identity and API key associated with the current credentials. Operators may be AI agents or humans with captured sessions.',
+    {},
+    async () => jsonResult(await client.get('/v1/operators/me')),
+  );
+
+  server.tool(
     'invariance_agent_me',
     'Show the agent identity and API key associated with the current credentials. Useful for confirming which agent context the MCP server is operating as.',
     {},
@@ -31,6 +38,26 @@ export function registerAgentTools(server: McpServer, client: InvarianceClient):
   // INVARIANCE_API_KEY=<JWT> for stdio, or Authorization: Bearer <JWT> in HTTP
   // mode). With a default agent API key, these endpoints will 401.
   server.tool(
+    'invariance_operator_create',
+    "Create a new operator inside one of the caller's projects. Set operator_type to agent for autonomous systems or human for people/sources such as screen recordings, microphone capture, meetings, or Granola notes. Requires a user-session JWT bearer.",
+    {
+      name: z.string().describe('Operator name (visible in the dashboard).'),
+      project_id: z.string().describe('Project ID the operator will live under. The caller must be a member.'),
+      operator_type: z.enum(['agent', 'human']).optional().describe('Defaults to agent. Use human for people-backed capture sessions.'),
+      public_key: z
+        .string()
+        .optional()
+        .describe('Optional Ed25519 public key (64-char lowercase hex). Can be set later via invariance_agent_set_key.'),
+    },
+    async ({ name, project_id, operator_type, public_key }) => {
+      const body: Record<string, unknown> = { name, project_id };
+      if (operator_type !== undefined) body.operator_type = operator_type;
+      if (public_key !== undefined) body.public_key = public_key;
+      return jsonResult(await client.post('/v1/operators', body));
+    },
+  );
+
+  server.tool(
     'invariance_agent_create',
     "Create a new agent inside one of the caller's projects. Requires a user-session JWT bearer (not an agent API key) — see invariance-cli `inv auth signup` / `inv auth signin` to obtain one.",
     {
@@ -49,6 +76,16 @@ export function registerAgentTools(server: McpServer, client: InvarianceClient):
   );
 
   server.tool(
+    'invariance_operator_list',
+    "List operators inside one of the caller's projects. Requires a user-session JWT bearer.",
+    {
+      project_id: z.string().describe('Project ID. The caller must be a member.'),
+    },
+    async ({ project_id }) =>
+      jsonResult(await client.get('/v1/operators', { project_id })),
+  );
+
+  server.tool(
     'invariance_agent_list',
     "List agents inside one of the caller's projects. Requires a user-session JWT bearer.",
     {
@@ -56,6 +93,16 @@ export function registerAgentTools(server: McpServer, client: InvarianceClient):
     },
     async ({ project_id }) =>
       jsonResult(await client.get('/v1/agents', { project_id })),
+  );
+
+  server.tool(
+    'invariance_operator_get',
+    'Fetch a single operator by ID. Requires a user-session JWT bearer.',
+    { id: z.string().describe('Operator ID.') },
+    async ({ id }) => {
+      const res = await client.get<{ operator?: unknown; agent?: unknown }>(`/v1/operators/${encodeURIComponent(id)}`);
+      return jsonResult(res.operator ?? res.agent);
+    },
   );
 
   server.tool(
