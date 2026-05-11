@@ -6,3 +6,8 @@ dist/
 coverage/
 .DS_Store
 package-lock.json
+
+# Local working state — not tracked
+_archive/
+_review/
+_worktrees/
