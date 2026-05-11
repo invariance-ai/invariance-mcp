@@ -265,4 +265,46 @@ export function registerEvalTools(server: McpServer, client: InvarianceClient): 
         }),
       ),
   );
+
+  server.tool(
+    'invariance_eval_scorers_list_builtin',
+    'List the built-in scorer kinds available on the platform (name + config schema). Use this to discover what you can pass in `scorer_specs` to invariance_eval_experiment_run.',
+    {},
+    async () => jsonResult(await client.get('/v1/scorers')),
+  );
+
+  server.tool(
+    'invariance_eval_experiment_run',
+    'Execute an experiment against an existing eval run: applies a list of scorer specs to every case result and (optionally) records a baseline run for later compare. Populates eval_results.scores. Built-in scorer names: exact_match, contains, numeric_tolerance (config.tolerance: number), json_match, levenshtein.',
+    {
+      id: z.string().describe('Eval run ID to score, e.g. "erun_abc123".'),
+      body: z.string().describe(
+        'ExperimentRunRequest as a JSON object string. Required: scorer_specs (ScorerSpec[] — each {"name": ScorerName, "config"?: object}). Optional: baseline_run_id (string — pointer to a prior eval run for diffing). Example: {"scorer_specs":[{"name":"exact_match"},{"name":"numeric_tolerance","config":{"tolerance":0.1}}],"baseline_run_id":"erun_prev"}',
+      ),
+    },
+    async ({ id, body }) => {
+      const parsed = parseJsonArg('body', body);
+      const res = await client.post<{ eval_run: unknown }>(
+        `/v1/eval-runs/${encodeURIComponent(id)}/experiment`,
+        parsed,
+      );
+      return jsonResult(res.eval_run);
+    },
+  );
+
+  server.tool(
+    'invariance_eval_experiment_compare',
+    'Compare two scored eval runs case-by-case (CompareResponse: per-case ScoreDelta entries + aggregate deltas per scorer). Use to surface regressions vs. a baseline.',
+    {
+      id: z.string().describe('Eval run ID (the new / candidate run).'),
+      baseline: z.string().describe('Baseline eval run ID to diff against.'),
+    },
+    async ({ id, baseline }) => {
+      const res = await client.get<{ comparison: unknown }>(
+        `/v1/eval-runs/${encodeURIComponent(id)}/compare`,
+        { baseline },
+      );
+      return jsonResult(res.comparison);
+    },
+  );
 }

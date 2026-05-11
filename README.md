@@ -86,7 +86,7 @@ Add to your Cursor MCP settings (`.cursor/mcp.json`):
 
 ## Available tools
 
-The server exposes **74 tools** (plus 6 legacy aliases) covering Invariance API workflows. Names follow `invariance_<resource>_<action>`.
+The server exposes **77 tools** (plus 6 legacy aliases) covering Invariance API workflows. Names follow `invariance_<resource>_<action>`.
 
 **Runs** (`invariance_run_*`)
 `start`, `get`, `list`, `finish`, `fail`, `verify`, `metrics`, `operational_graph`, `llm_calls`, `node_types`, `node_type_metrics`, `fork`, `inspect`
@@ -113,7 +113,7 @@ The server exposes **74 tools** (plus 6 legacy aliases) covering Invariance API 
 `read`, `write` — record what the agent looked up or wrote about a subject (customer, account, policy, …).
 
 **Evals** (`invariance_eval_*`)
-`dataset_create`, `dataset_list`, `dataset_get`, `dataset_append_example`, `dataset_examples_list`, `scorer_create`, `scorer_list`, `suite_create`, `suite_list`, `suite_get`, `case_create`, `case_create_from_run`, `case_list`, `suite_run`, `run_get`, `run_results` — author datasets/scorers/suites, kick off eval runs against agents or recipes, and read per-case scored results. `experiment_run` / `experiment_compare` are pending the platform routes.
+`dataset_create`, `dataset_list`, `dataset_get`, `dataset_append_example`, `dataset_examples_list`, `scorer_create`, `scorer_list`, `scorers_list_builtin`, `suite_create`, `suite_list`, `suite_get`, `case_create`, `case_create_from_run`, `case_list`, `suite_run`, `run_get`, `run_results`, `experiment_run`, `experiment_compare` — author datasets/scorers/suites, kick off eval runs against agents or recipes, score them with built-in scorers (exact_match, contains, numeric_tolerance, json_match, levenshtein), and diff a candidate run against a baseline.
 
 **Insights**
 `invariance_narrative_get` (LLM-synthesized run summary), `invariance_ask` (turn-based Q&A over your KB + runs), `invariance_kb_pages_list`, `invariance_kb_page_get`, `invariance_kb_page_create`, `invariance_kb_page_update`, `invariance_kb_page_delete`, `invariance_kb_session_create`, `invariance_kb_session_delete`, `invariance_kb_session_list_messages`, `invariance_kb_session_append_message`.
