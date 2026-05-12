@@ -260,6 +260,108 @@ beforeEach(async () => {
     if (method === 'POST' && url.pathname === '/v1/kb/sessions/sess_1/messages') {
       return json({ message: { id: 'msg_2', ...body } }, 201);
     }
+    if (method === 'GET' && url.pathname === '/v1/operators/me') {
+      return json({
+        operator: {
+          id: 'op_1',
+          name: 'me',
+          operator_type: 'agent',
+          project_id: 'p1',
+        },
+      });
+    }
+    if (method === 'POST' && url.pathname === '/v1/operators') {
+      return json(
+        {
+          operator: {
+            id: 'op_new',
+            name: body?.name ?? 'untitled',
+            operator_type: body?.operator_type ?? 'agent',
+            project_id: body?.project_id ?? 'p1',
+          },
+        },
+        201,
+      );
+    }
+    if (method === 'GET' && url.pathname === '/v1/operators') {
+      return json({
+        data: [
+          { id: 'op_1', name: 'me', operator_type: 'agent', project_id: 'p1' },
+        ],
+        next_cursor: null,
+      });
+    }
+    if (method === 'GET' && url.pathname === '/v1/operators/op_1') {
+      return json({
+        operator: { id: 'op_1', name: 'me', operator_type: 'agent', project_id: 'p1' },
+      });
+    }
+    if (method === 'POST' && url.pathname === '/v1/agent-sessions') {
+      return json(
+        {
+          session: {
+            id: 'sess_new',
+            source: body?.source,
+            external_session_id: body?.external_session_id,
+            session_type: body?.session_type ?? null,
+            title: body?.title ?? null,
+            agent_id: body?.agent_id ?? null,
+            run_id: body?.run_id ?? null,
+            metadata: body?.metadata ?? null,
+            status: 'open',
+          },
+        },
+        201,
+      );
+    }
+    if (method === 'GET' && url.pathname === '/v1/agent-sessions') {
+      return json({
+        data: [
+          {
+            id: 'sess_new',
+            source: 'api',
+            external_session_id: 'ext_1',
+            agent_id: 'agent_1',
+            run_id: null,
+            status: 'open',
+          },
+        ],
+        next_cursor: null,
+      });
+    }
+    if (method === 'GET' && url.pathname === '/v1/agent-sessions/sess_new') {
+      return json({
+        session: {
+          id: 'sess_new',
+          source: 'api',
+          external_session_id: 'ext_1',
+          status: 'open',
+        },
+      });
+    }
+    if (method === 'POST' && url.pathname === '/v1/agent-sessions/sess_new/events') {
+      return json(
+        {
+          event: {
+            id: 'evt_1',
+            session_id: 'sess_new',
+            type: body?.type,
+            payload: body?.payload,
+          },
+        },
+        201,
+      );
+    }
+    if (method === 'PATCH' && url.pathname === '/v1/agent-sessions/sess_new') {
+      return json({
+        session: {
+          id: 'sess_new',
+          source: 'api',
+          run_id: body?.run_id ?? null,
+          status: 'open',
+        },
+      });
+    }
     if (method === 'POST' && url.pathname === '/v1/memory/read') {
       return json({
         access: {
@@ -377,6 +479,11 @@ describe('Invariance MCP server', () => {
       'invariance_kb_session_create', 'invariance_kb_session_delete',
       'invariance_kb_session_list_messages', 'invariance_kb_session_append_message',
       'invariance_memory_read', 'invariance_memory_write',
+      'invariance_operator_me', 'invariance_operator_create',
+      'invariance_operator_list', 'invariance_operator_get',
+      'invariance_session_create', 'invariance_session_list',
+      'invariance_session_get', 'invariance_session_append_note',
+      'invariance_session_attach_run', 'invariance_session_record_summary_to_kb',
     ]) {
       expect(names.has(expected), `missing tool ${expected}`).toBe(true);
     }
@@ -731,6 +838,159 @@ describe('Invariance MCP server', () => {
       value: 'email',
       source: 'agent_write',
       confidence: 1.0,
+    });
+  });
+
+  it('returns operator identity via invariance_operator_me', async () => {
+    const result = contentJson(
+      await client.callTool({ name: 'invariance_operator_me', arguments: {} }),
+    ) as { operator?: { id?: string; operator_type?: string } };
+    expect(result.operator?.id).toBe('op_1');
+    expect(result.operator?.operator_type).toBe('agent');
+  });
+
+  it('creates an operator with operator_type', async () => {
+    const result = contentJson(
+      await client.callTool({
+        name: 'invariance_operator_create',
+        arguments: { name: 'alice', project_id: 'p1', operator_type: 'human' },
+      }),
+    ) as { operator: { id: string; operator_type: string } };
+    expect(result.operator.id).toBe('op_new');
+    expect(result.operator.operator_type).toBe('human');
+    const call = requests.find((r) => r.method === 'POST' && r.path === '/v1/operators');
+    expect(call?.body).toEqual({ name: 'alice', project_id: 'p1', operator_type: 'human' });
+  });
+
+  it('lists operators filtered by operator_type', async () => {
+    const result = contentJson(
+      await client.callTool({
+        name: 'invariance_operator_list',
+        arguments: { project_id: 'p1', operator_type: 'agent' },
+      }),
+    ) as { data: Array<{ id: string }> };
+    expect(result.data.length).toBe(1);
+    const call = requests.find(
+      (r) => r.method === 'GET' && r.path.startsWith('/v1/operators?'),
+    );
+    expect(call?.path).toContain('project_id=p1');
+    expect(call?.path).toContain('operator_type=agent');
+  });
+
+  it('fetches a single operator via invariance_operator_get', async () => {
+    const result = contentJson(
+      await client.callTool({
+        name: 'invariance_operator_get',
+        arguments: { id: 'op_1' },
+      }),
+    ) as { id: string };
+    expect(result.id).toBe('op_1');
+  });
+
+  it('creates an agent-session for a Claude Code task', async () => {
+    const result = contentJson(
+      await client.callTool({
+        name: 'invariance_session_create',
+        arguments: {
+          source: 'api',
+          external_session_id: 'ext_1',
+          session_type: 'claude_code',
+          title: 'ship feature X',
+          agent_id: 'agent_1',
+          metadata: '{"branch":"feat/x"}',
+        },
+      }),
+    ) as { id: string; source: string; metadata: { branch: string } };
+    expect(result.id).toBe('sess_new');
+    expect(result.source).toBe('api');
+    const call = requests.find(
+      (r) => r.method === 'POST' && r.path === '/v1/agent-sessions',
+    );
+    expect(call?.body).toEqual({
+      source: 'api',
+      external_session_id: 'ext_1',
+      session_type: 'claude_code',
+      title: 'ship feature X',
+      agent_id: 'agent_1',
+      metadata: { branch: 'feat/x' },
+    });
+  });
+
+  it('lists agent-sessions filtered by source', async () => {
+    const result = contentJson(
+      await client.callTool({
+        name: 'invariance_session_list',
+        arguments: { source: 'meeting', status: 'open' },
+      }),
+    ) as { data: unknown[] };
+    expect(result.data.length).toBe(1);
+    const call = requests.find(
+      (r) => r.method === 'GET' && r.path.startsWith('/v1/agent-sessions?'),
+    );
+    expect(call?.path).toContain('source=meeting');
+    expect(call?.path).toContain('status=open');
+  });
+
+  it('gets a single agent-session', async () => {
+    const result = contentJson(
+      await client.callTool({
+        name: 'invariance_session_get',
+        arguments: { id: 'sess_new' },
+      }),
+    ) as { id: string };
+    expect(result.id).toBe('sess_new');
+  });
+
+  it('appends a note as a custom event', async () => {
+    const result = contentJson(
+      await client.callTool({
+        name: 'invariance_session_append_note',
+        arguments: { session_id: 'sess_new', text: 'trying approach X' },
+      }),
+    ) as { session_id: string; type: string; payload: { text: string } };
+    expect(result.type).toBe('note');
+    expect(result.payload.text).toBe('trying approach X');
+    const call = requests.find(
+      (r) =>
+        r.method === 'POST' && r.path === '/v1/agent-sessions/sess_new/events',
+    );
+    expect(call?.body).toEqual({ type: 'note', payload: { text: 'trying approach X' } });
+  });
+
+  it('attaches a run to a session via PATCH', async () => {
+    const result = contentJson(
+      await client.callTool({
+        name: 'invariance_session_attach_run',
+        arguments: { session_id: 'sess_new', run_id: 'run_1' },
+      }),
+    ) as { id: string; run_id: string };
+    expect(result.id).toBe('sess_new');
+    expect(result.run_id).toBe('run_1');
+    const call = requests.find(
+      (r) => r.method === 'PATCH' && r.path === '/v1/agent-sessions/sess_new',
+    );
+    expect(call?.body).toEqual({ run_id: 'run_1' });
+  });
+
+  it('records a session summary to the KB', async () => {
+    const result = contentJson(
+      await client.callTool({
+        name: 'invariance_session_record_summary_to_kb',
+        arguments: {
+          session_id: 'sess_new',
+          title: 'Summary',
+          body: '# done',
+        },
+      }),
+    ) as { id: string; title: string; kind: string };
+    expect(result).toMatchObject({ id: 'page_1', title: 'Summary', kind: 'session_summary' });
+    const call = requests.find((r) => r.method === 'POST' && r.path === '/v1/kb/pages');
+    expect(call?.body).toMatchObject({
+      path: 'sessions/sess_new',
+      title: 'Summary',
+      body: '# done',
+      kind: 'session_summary',
+      metadata: { session_id: 'sess_new' },
     });
   });
 
