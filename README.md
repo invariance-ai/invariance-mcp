@@ -86,7 +86,7 @@ Add to your Cursor MCP settings (`.cursor/mcp.json`):
 
 ## Available tools
 
-The server exposes **77 tools** (plus 6 legacy aliases) covering Invariance API workflows. Names follow `invariance_<resource>_<action>`.
+The server exposes **86 tools** (plus 6 legacy aliases) covering Invariance API workflows. Names follow `invariance_<resource>_<action>`.
 
 **Runs** (`invariance_run_*`)
 `start`, `get`, `list`, `finish`, `fail`, `verify`, `metrics`, `operational_graph`, `llm_calls`, `node_types`, `node_type_metrics`, `fork`, `inspect`
@@ -108,6 +108,12 @@ The server exposes **77 tools** (plus 6 legacy aliases) covering Invariance API 
 
 **Agents** (`invariance_agent_*`)
 `me`, `set_key`, `create`, `list`, `get`
+
+**Operators** (`invariance_operator_*`)
+`me`, `create`, `list`, `get` — the unified actor model. Every Claude Code session, autonomous agent, and human teammate is an operator. Use `operator_type='agent'` for autonomous workers, `operator_type='human'` for teammates whose screen recordings, microphone capture, meetings, and Granola notes feed the company brain.
+
+**Sessions** (`invariance_session_*`)
+`create`, `list`, `get`, `append_note`, `attach_run`, `record_summary_to_kb` — capture sessions that group runs, notes, and KB summaries under a single operator's work.
 
 **Memory** (`invariance_memory_*`)
 `read`, `write` — record what the agent looked up or wrote about a subject (customer, account, policy, …).
