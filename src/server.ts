@@ -19,6 +19,7 @@ import { registerMemoryTools } from './tools/memory.js';
 import { registerEvalTools } from './tools/evals.js';
 import { registerOperatorTools } from './tools/operators.js';
 import { registerSessionTools } from './tools/sessions.js';
+import { registerCaseTools } from './tools/cases.js';
 
 export const SERVER_NAME = 'invariance';
 export const SERVER_VERSION = '0.3.0';
@@ -57,6 +58,7 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
   registerEvalTools(server, client);
   registerOperatorTools(server, client);
   registerSessionTools(server, client);
+  registerCaseTools(server, client);
   registerLegacyAliases(server, client);
 
   return server;

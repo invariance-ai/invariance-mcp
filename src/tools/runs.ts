@@ -15,12 +15,29 @@ export function registerRunTools(server: McpServer, client: InvarianceClient): v
         .describe(
           'Free-form metadata as a JSON object string. Example: {"user_id":"u_42","workspace":"acme","risk_tier":"high"}',
         ),
+      case_id: z
+        .string()
+        .optional()
+        .describe(
+          'Case (workflow instance) this run belongs to. Server inherits tenant_id/end_user_id from the case. Create one first with invariance_case_create.',
+        ),
+      tenant_id: z
+        .string()
+        .optional()
+        .describe('Override tenant_id (normally inherited from case). Your customer (the platform user / firm).'),
+      end_user_id: z
+        .string()
+        .optional()
+        .describe('Override end_user_id (normally inherited from case). The human the workflow acts on behalf of.'),
     },
-    async ({ name, metadata }) => {
+    async ({ name, metadata, case_id, tenant_id, end_user_id }) => {
       const body: Record<string, unknown> = {};
       if (name !== undefined) body.name = name;
       const meta = parseJsonArg('metadata', metadata);
       if (meta !== undefined) body.metadata = meta;
+      if (case_id !== undefined) body.case_id = case_id;
+      if (tenant_id !== undefined) body.tenant_id = tenant_id;
+      if (end_user_id !== undefined) body.end_user_id = end_user_id;
       const res = await client.post<{ run: unknown }>('/v1/runs', body);
       return jsonResult(res.run);
     },
