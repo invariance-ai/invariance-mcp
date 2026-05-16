@@ -20,9 +20,10 @@ import { registerEvalTools } from './tools/evals.js';
 import { registerOperatorTools } from './tools/operators.js';
 import { registerSessionTools } from './tools/sessions.js';
 import { registerCaseTools } from './tools/cases.js';
+import { registerDoctorTool } from './tools/doctor.js';
 
-export const SERVER_NAME = 'invariance';
-export const SERVER_VERSION = '0.3.0';
+import { SERVER_NAME, SERVER_VERSION } from './version.js';
+export { SERVER_NAME, SERVER_VERSION };
 
 export interface CreateServerOptions {
   /**
@@ -59,6 +60,7 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
   registerOperatorTools(server, client);
   registerSessionTools(server, client);
   registerCaseTools(server, client);
+  registerDoctorTool(server, client);
   registerLegacyAliases(server, client);
 
   return server;

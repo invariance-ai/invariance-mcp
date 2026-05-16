@@ -1,10 +1,11 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { InvarianceClient } from '../lib/client.js';
-import { jsonResult, parseJsonArg } from '../lib/util.js';
+import { jsonResult, parseJsonArg, registerReadTool, registerWriteTool } from '../lib/util.js';
 
 export function registerMonitorTools(server: McpServer, client: InvarianceClient): void {
-  server.tool(
+  registerWriteTool(
+    server,
     'invariance_monitor_create',
     'Create a monitor that evaluates an event-shaped predicate against nodes/runs and optionally emits signals, findings, or reviews when matched.',
     {
@@ -19,7 +20,8 @@ export function registerMonitorTools(server: McpServer, client: InvarianceClient
     },
   );
 
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_monitor_list',
     'List monitors visible to the calling agent (paginated).',
     {
@@ -33,7 +35,8 @@ export function registerMonitorTools(server: McpServer, client: InvarianceClient
       jsonResult(await client.get('/v1/monitors', { cursor, limit })),
   );
 
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_monitor_get',
     'Get a monitor by ID',
     { id: z.string() },
@@ -45,7 +48,8 @@ export function registerMonitorTools(server: McpServer, client: InvarianceClient
     },
   );
 
-  server.tool(
+  registerWriteTool(
+    server,
     'invariance_monitor_update',
     'Patch an existing monitor (partial update; only included fields change).',
     {
@@ -64,7 +68,8 @@ export function registerMonitorTools(server: McpServer, client: InvarianceClient
     },
   );
 
-  server.tool(
+  registerWriteTool(
+    server,
     'invariance_monitor_pause',
     'Disable a monitor so it stops firing (preserves the spec; use invariance_monitor_resume to re-enable).',
     { id: z.string() },
@@ -77,7 +82,8 @@ export function registerMonitorTools(server: McpServer, client: InvarianceClient
     },
   );
 
-  server.tool(
+  registerWriteTool(
+    server,
     'invariance_monitor_resume',
     'Re-enable a paused monitor so it begins firing again.',
     { id: z.string() },
@@ -90,7 +96,8 @@ export function registerMonitorTools(server: McpServer, client: InvarianceClient
     },
   );
 
-  server.tool(
+  registerWriteTool(
+    server,
     'invariance_monitor_evaluate',
     'Manually evaluate a monitor right now against an explicit input scope (returns the resulting execution plus any signals/findings/reviews produced).',
     {
@@ -110,7 +117,8 @@ export function registerMonitorTools(server: McpServer, client: InvarianceClient
     },
   );
 
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_monitor_executions',
     'List past evaluation executions for a monitor (each has status, trigger, matched_node_ids, timing).',
     {
@@ -130,7 +138,8 @@ export function registerMonitorTools(server: McpServer, client: InvarianceClient
       ),
   );
 
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_monitor_findings',
     'List findings produced by a monitor across all of its executions.',
     {

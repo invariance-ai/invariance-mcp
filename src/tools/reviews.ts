@@ -1,12 +1,13 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { InvarianceClient } from '../lib/client.js';
-import { jsonResult } from '../lib/util.js';
+import { jsonResult, registerReadTool, registerWriteTool } from '../lib/util.js';
 
 const decisionEnum = z.enum(['passed', 'failed', 'needs_fix']);
 
 export function registerReviewTools(server: McpServer, client: InvarianceClient): void {
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_review_list',
     'List reviews (work items requesting agent/human adjudication of a finding or run) in the queue, paginated.',
     {
@@ -20,7 +21,8 @@ export function registerReviewTools(server: McpServer, client: InvarianceClient)
       jsonResult(await client.get('/v1/reviews', { cursor, limit })),
   );
 
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_review_get',
     'Get a review by ID.',
     { id: z.string() },
@@ -32,7 +34,8 @@ export function registerReviewTools(server: McpServer, client: InvarianceClient)
     },
   );
 
-  server.tool(
+  registerWriteTool(
+    server,
     'invariance_review_claim',
     'Claim a pending review for the calling agent — sets status to "claimed" so other agents do not pick it up. Pair with invariance_review_resolve when done, or invariance_review_unclaim to release.',
     {
@@ -50,7 +53,8 @@ export function registerReviewTools(server: McpServer, client: InvarianceClient)
     },
   );
 
-  server.tool(
+  registerWriteTool(
+    server,
     'invariance_review_unclaim',
     'Release a previously-claimed review back to "pending" so another agent can pick it up. Does not record a decision — use invariance_review_resolve for that.',
     {
@@ -68,7 +72,8 @@ export function registerReviewTools(server: McpServer, client: InvarianceClient)
     },
   );
 
-  server.tool(
+  registerWriteTool(
+    server,
     'invariance_review_resolve',
     'Close a review by recording a decision: "passed" (looks good, no action), "failed" (issue confirmed, should not ship), or "needs_fix" (issue confirmed, fix-and-retry).',
     {

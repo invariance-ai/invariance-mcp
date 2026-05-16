@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { InvarianceClient } from '../lib/client.js';
-import { jsonResult, parseJsonArg } from '../lib/util.js';
+import { jsonResult, parseJsonArg, registerReadTool, registerWriteTool } from '../lib/util.js';
 
 const SubjectType = z.enum([
   'customer',
@@ -22,7 +22,12 @@ const Source = z.enum([
 ]);
 
 export function registerMemoryTools(server: McpServer, client: InvarianceClient): void {
-  server.tool(
+  // readOnlyHint=true: the user-visible semantic is "observe a belief". The server-side
+  // MemoryAccess audit event is idempotent bookkeeping (provenance for divergence
+  // detectors), not a mutation of agent-addressable state — so the Read annotation
+  // accurately conveys the contract to client UIs/approval flows.
+  registerReadTool(
+    server,
     'invariance_memory_read',
     'Record a memory read by an agent against a subject (customer/account/policy/...) and return the current MemoryRecord (if any). Use this whenever an agent consults a remembered belief — it produces an auditable MemoryAccess event tying that belief to a node in the run, which the divergence detectors use to flag stale or unsupported memory.',
     {
@@ -49,7 +54,8 @@ export function registerMemoryTools(server: McpServer, client: InvarianceClient)
     },
   );
 
-  server.tool(
+  registerWriteTool(
+    server,
     'invariance_memory_write',
     'Record a memory write by an agent: set or update a belief (claim) about a subject. Returns the new MemoryAccess + MemoryRecord. Defaults: source="agent_write", confidence=1.0. Provide `provenance` (EvidenceRef[] as JSON) when the claim is derived from authoritative records (CRM/ticket/policy doc) so downstream divergence checks can verify it.',
     {

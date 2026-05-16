@@ -28,3 +28,71 @@ export function apiNotAvailableResult(tool: string, detail?: string) {
 }
 
 export type PageOpts = { cursor?: string; limit?: number };
+
+import type { McpServer, ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
+
+type ZodRawShape = Record<string, import('zod').ZodTypeAny>;
+type Handler<S extends ZodRawShape> = ToolCallback<S>;
+
+// Thin wrappers over server.registerTool() that bake in the right MCP annotations
+// so agent clients can distinguish read-only inspection tools from state-changing
+// ones (Claude Desktop and others surface these as UI hints). All Invariance tools
+// hit an external HTTP API, so openWorldHint is always true.
+
+const OPEN_WORLD = { openWorldHint: true } as const;
+
+export function registerReadTool<S extends ZodRawShape>(
+  server: McpServer,
+  name: string,
+  description: string,
+  inputSchema: S,
+  handler: Handler<S>,
+) {
+  return server.registerTool(
+    name,
+    {
+      description,
+      inputSchema,
+      annotations: { readOnlyHint: true, ...OPEN_WORLD },
+    },
+    handler as never,
+  );
+}
+
+export function registerWriteTool<S extends ZodRawShape>(
+  server: McpServer,
+  name: string,
+  description: string,
+  inputSchema: S,
+  handler: Handler<S>,
+) {
+  return server.registerTool(
+    name,
+    {
+      description,
+      inputSchema,
+      // destructiveHint=false means "writes/creates state, but not destructive"
+      // (per MCP spec). Use registerDestructiveTool for delete/cancel-style.
+      annotations: { readOnlyHint: false, destructiveHint: false, ...OPEN_WORLD },
+    },
+    handler as never,
+  );
+}
+
+export function registerDestructiveTool<S extends ZodRawShape>(
+  server: McpServer,
+  name: string,
+  description: string,
+  inputSchema: S,
+  handler: Handler<S>,
+) {
+  return server.registerTool(
+    name,
+    {
+      description,
+      inputSchema,
+      annotations: { readOnlyHint: false, destructiveHint: true, ...OPEN_WORLD },
+    },
+    handler as never,
+  );
+}

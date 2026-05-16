@@ -484,8 +484,22 @@ describe('Invariance MCP server', () => {
       'invariance_session_create', 'invariance_session_list',
       'invariance_session_get', 'invariance_session_append_note',
       'invariance_session_attach_run', 'invariance_session_record_summary_to_kb',
+      'invariance_doctor',
     ]) {
       expect(names.has(expected), `missing tool ${expected}`).toBe(true);
+    }
+
+    // Every modern tool must carry annotations so agent clients can distinguish
+    // read-only from state-changing tools without reading prose descriptions.
+    for (const tool of result.tools) {
+      if (tool.name.startsWith('invariance_create_') || tool.name.startsWith('invariance_get_') ||
+          tool.name.startsWith('invariance_list_') || tool.name.startsWith('invariance_write_') ||
+          tool.name === 'invariance_verify_run') {
+        continue; // legacy aliases — skip
+      }
+      expect(tool.annotations, `tool ${tool.name} missing annotations`).toBeDefined();
+      expect(tool.annotations?.openWorldHint, `tool ${tool.name} missing openWorldHint`).toBe(true);
+      expect(typeof tool.annotations?.readOnlyHint, `tool ${tool.name} missing readOnlyHint`).toBe('boolean');
     }
 
     for (const legacy of [
@@ -555,6 +569,15 @@ describe('Invariance MCP server', () => {
       run_id: 'run_1',
     });
     expect(call?.headers.get('Idempotency-Key')).toMatch(/^[A-Za-z0-9_-]+/);
+  });
+
+  it('reports health via invariance_doctor', async () => {
+    const result = contentJson(
+      await client.callTool({ name: 'invariance_doctor', arguments: {} }),
+    ) as { checks: { name: string; status: string }[]; summary: { pass: number; fail: number; warn: number } };
+    expect(result.checks.length).toBeGreaterThan(0);
+    expect(result.summary.fail).toBe(0);
+    expect(result.checks.some((c) => c.name.startsWith('API'))).toBe(true);
   });
 
   it('returns the authenticated agent via invariance_agent_me', async () => {

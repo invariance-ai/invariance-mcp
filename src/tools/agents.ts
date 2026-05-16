@@ -1,17 +1,19 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { InvarianceClient } from '../lib/client.js';
-import { jsonResult } from '../lib/util.js';
+import { jsonResult, registerReadTool, registerWriteTool } from '../lib/util.js';
 
 export function registerAgentTools(server: McpServer, client: InvarianceClient): void {
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_agent_me',
     'Show the agent identity and API key associated with the current credentials. Useful for confirming which agent context the MCP server is operating as.',
     {},
     async () => jsonResult(await client.get('/v1/agents/me')),
   );
 
-  server.tool(
+  registerWriteTool(
+    server,
     'invariance_agent_set_key',
     "Register or rotate the calling agent's Ed25519 public key. Once set, every node written by this agent must be signed with the matching private key (the server uses this key to verify signatures during invariance_run_verify).",
     {
@@ -30,7 +32,8 @@ export function registerAgentTools(server: McpServer, client: InvarianceClient):
   // server must be started with the user JWT as the bearer (e.g.
   // INVARIANCE_API_KEY=<JWT> for stdio, or Authorization: Bearer <JWT> in HTTP
   // mode). With a default agent API key, these endpoints will 401.
-  server.tool(
+  registerWriteTool(
+    server,
     'invariance_agent_create',
     "Create a new agent inside one of the caller's projects. Requires a user-session JWT bearer (not an agent API key) — see invariance-cli `inv auth signup` / `inv auth signin` to obtain one.",
     {
@@ -48,7 +51,8 @@ export function registerAgentTools(server: McpServer, client: InvarianceClient):
     },
   );
 
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_agent_list',
     "List agents inside one of the caller's projects. Requires a user-session JWT bearer.",
     {
@@ -58,7 +62,8 @@ export function registerAgentTools(server: McpServer, client: InvarianceClient):
       jsonResult(await client.get('/v1/agents', { project_id })),
   );
 
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_agent_get',
     'Fetch a single agent by ID. Requires a user-session JWT bearer.',
     { id: z.string().describe('Agent ID.') },

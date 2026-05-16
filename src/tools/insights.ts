@@ -1,13 +1,14 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { InvarianceClient } from '../lib/client.js';
-import { jsonResult, parseJsonArg } from '../lib/util.js';
+import { jsonResult, parseJsonArg, registerDestructiveTool, registerReadTool, registerWriteTool } from '../lib/util.js';
 
 const kbPageKind = z.enum(['wiki', 'run', 'note']);
 const kbMessageRole = z.enum(['user', 'assistant', 'tool']);
 
 export function registerInsightTools(server: McpServer, client: InvarianceClient): void {
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_narrative_get',
     'Fetch (or regenerate) the LLM-synthesized narrative for a run',
     {
@@ -23,7 +24,8 @@ export function registerInsightTools(server: McpServer, client: InvarianceClient
     },
   );
 
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_ask',
     "Ask a question against the agent's runs / knowledge base (turn-based session)",
     {
@@ -41,7 +43,8 @@ export function registerInsightTools(server: McpServer, client: InvarianceClient
     },
   );
 
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_kb_pages_list',
     'List knowledge-base pages',
     {
@@ -54,7 +57,8 @@ export function registerInsightTools(server: McpServer, client: InvarianceClient
       jsonResult(await client.get('/v1/kb/pages', { kind, search, cursor, limit })),
   );
 
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_kb_page_get',
     'Get a knowledge-base page by ID',
     { id: z.string() },
@@ -66,7 +70,8 @@ export function registerInsightTools(server: McpServer, client: InvarianceClient
     },
   );
 
-  server.tool(
+  registerWriteTool(
+    server,
     'invariance_kb_page_create',
     'Create a knowledge-base page',
     {
@@ -85,7 +90,8 @@ export function registerInsightTools(server: McpServer, client: InvarianceClient
     },
   );
 
-  server.tool(
+  registerWriteTool(
+    server,
     'invariance_kb_page_update',
     'Update fields on a knowledge-base page',
     {
@@ -109,7 +115,8 @@ export function registerInsightTools(server: McpServer, client: InvarianceClient
     },
   );
 
-  server.tool(
+  registerDestructiveTool(
+    server,
     'invariance_kb_page_delete',
     'Delete a knowledge-base page',
     { id: z.string() },
@@ -119,7 +126,8 @@ export function registerInsightTools(server: McpServer, client: InvarianceClient
     },
   );
 
-  server.tool(
+  registerWriteTool(
+    server,
     'invariance_kb_session_create',
     'Create a multi-turn ask session for the agent KB',
     {
@@ -135,7 +143,8 @@ export function registerInsightTools(server: McpServer, client: InvarianceClient
     },
   );
 
-  server.tool(
+  registerDestructiveTool(
+    server,
     'invariance_kb_session_delete',
     'Delete a KB ask session',
     { id: z.string() },
@@ -145,7 +154,8 @@ export function registerInsightTools(server: McpServer, client: InvarianceClient
     },
   );
 
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_kb_session_list_messages',
     'List all messages in a KB ask session in order',
     { id: z.string() },
@@ -157,7 +167,8 @@ export function registerInsightTools(server: McpServer, client: InvarianceClient
     },
   );
 
-  server.tool(
+  registerWriteTool(
+    server,
     'invariance_kb_session_append_message',
     'Append a message to a KB ask session',
     {
