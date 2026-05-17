@@ -16,6 +16,7 @@ import { registerAgentTools } from './tools/agents.js';
 import { registerInsightTools } from './tools/insights.js';
 import { registerOperationalTools } from './tools/operational.js';
 import { registerMemoryTools } from './tools/memory.js';
+import { registerCaseTools } from './tools/cases.js';
 
 export const SERVER_NAME = 'invariance';
 export const SERVER_VERSION = '0.3.0';
@@ -51,6 +52,7 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
   registerInsightTools(server, client);
   registerOperationalTools(server, client);
   registerMemoryTools(server, client);
+  registerCaseTools(server, client);
   registerLegacyAliases(server, client);
 
   return server;

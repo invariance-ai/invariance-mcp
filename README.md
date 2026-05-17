@@ -1,6 +1,6 @@
 # @invariance/mcp
 
-An MCP (Model Context Protocol) server that connects AI coding agents to the [Invariance](https://invariance.ai) observability platform. It gives tools like Claude Desktop, Cursor, and Claude Code direct access to your runs, nodes, monitors, signals, findings, reviews, and more.
+An MCP (Model Context Protocol) server that connects AI coding agents to the [Invariance](https://invariance.ai) workflow intelligence platform. It gives tools like Claude Desktop, Cursor, and Claude Code direct access to cases, runs, nodes, monitors, signals, findings, reviews, and more.
 
 MCP is an open protocol that lets AI assistants use external tools and data sources. This server implements it for Invariance, so your AI assistant can query observability data, investigate issues, and analyze agent behavior without leaving the conversation.
 
@@ -88,6 +88,9 @@ Add to your Cursor MCP settings (`.cursor/mcp.json`):
 
 The server exposes **61 tools** (plus 6 legacy aliases) covering Invariance API workflows. Names follow `invariance_<resource>_<action>`.
 
+**Cases** (`invariance_case_*`)
+`create`, `get`, `list`, `update`, `close`, `evidence`, `event_create`, `event_list` — create/find a workflow instance first, attach runs/events as evidence, then close with an outcome.
+
 **Runs** (`invariance_run_*`)
 `start`, `get`, `list`, `finish`, `fail`, `verify`, `metrics`, `operational_graph`, `llm_calls`, `node_types`, `node_type_metrics`, `fork`, `inspect`
 
@@ -122,6 +125,15 @@ The server exposes **61 tools** (plus 6 legacy aliases) covering Invariance API 
 `invariance_metrics_overview` (total runs / nodes / errors / cost over a window), `invariance_metrics_agents` (per-agent usage rollup).
 
 For complex object arguments (monitor body, signal data, node input/output, run metadata) tools accept JSON-encoded strings, which the server parses before dispatching to the API.
+
+## Agent workflow recipe
+
+1. List existing cases for the tenant, end-user, and workflow.
+2. Create a case if none exists.
+3. Start runs with `case_id`.
+4. Attach workflow events or external evidence refs as work progresses.
+5. Fetch `invariance_case_evidence` for investigation.
+6. Close the case with an outcome when resolved.
 
 ### Legacy tool aliases
 
