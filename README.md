@@ -86,7 +86,9 @@ Add to your Cursor MCP settings (`.cursor/mcp.json`):
 
 ## Available tools
 
-The server exposes **86 tools** (plus 6 legacy aliases) covering Invariance API workflows. Names follow `invariance_<resource>_<action>`.
+The server exposes **87 tools** (plus 6 legacy aliases) covering Invariance API workflows. Names follow `invariance_<resource>_<action>`.
+
+Every tool carries MCP annotations (`readOnlyHint`, `destructiveHint`, `openWorldHint`) so agent clients (Claude Desktop, etc.) can distinguish inspection tools from state-changing ones without parsing prose descriptions.
 
 **Runs** (`invariance_run_*`)
 `start`, `get`, `list`, `finish`, `fail`, `verify`, `metrics`, `operational_graph`, `llm_calls`, `node_types`, `node_type_metrics`, `fork`, `inspect`
@@ -129,6 +131,9 @@ The server exposes **86 tools** (plus 6 legacy aliases) covering Invariance API 
 
 **Cross-run metrics**
 `invariance_metrics_overview` (total runs / nodes / errors / cost over a window), `invariance_metrics_agents` (per-agent usage rollup).
+
+**Health**
+`invariance_doctor` — server + API + auth health check. Mirrors `inv doctor --json`. Use this first when an agent connects to verify its setup before issuing other calls.
 
 For complex object arguments (monitor body, signal data, node input/output, run metadata) tools accept JSON-encoded strings, which the server parses before dispatching to the API.
 

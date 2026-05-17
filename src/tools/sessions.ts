@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { InvarianceClient } from '../lib/client.js';
-import { jsonResult, parseJsonArg } from '../lib/util.js';
+import { jsonResult, parseJsonArg, registerReadTool, registerWriteTool } from '../lib/util.js';
 
 const sessionSource = z
   .enum(['screen_recording', 'microphone', 'meeting', 'granola_note', 'manual_note', 'api'])
@@ -16,7 +16,8 @@ const sessionSource = z
   );
 
 export function registerSessionTools(server: McpServer, client: InvarianceClient): void {
-  server.tool(
+  registerWriteTool(
+    server,
     'invariance_session_create',
     "Open a new agent-session — the canonical container for an operator's bounded chunk of work in the company brain. CALL THIS at the START of: a new Claude Code task (source='api'), a screen recording for a teammate (source='screen_recording'), a mic capture session (source='microphone'), a meeting (source='meeting'), ingestion of a Granola note (source='granola_note'), or a manual note-taking session (source='manual_note'). Events (transcript chunks, tool calls, screenshots, notes) are appended to this session via invariance_session_append_note or the events sub-route. Link a session to a run via agent_id+run_id (or call invariance_session_attach_run later).",
     {
@@ -54,7 +55,8 @@ export function registerSessionTools(server: McpServer, client: InvarianceClient
     },
   );
 
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_session_list',
     'List agent-sessions, optionally filtered by source, agent, run, or status. Use this to find all Claude Code work for an agent (source="api"), all meetings ingested today (source="meeting"), or all screen recordings for a human teammate.',
     {
@@ -72,7 +74,8 @@ export function registerSessionTools(server: McpServer, client: InvarianceClient
       ),
   );
 
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_session_get',
     'Fetch a single agent-session by ID, including its source, timestamps, attached run/agent, and metadata.',
     { id: z.string().describe('Session ID.') },
@@ -84,7 +87,8 @@ export function registerSessionTools(server: McpServer, client: InvarianceClient
     },
   );
 
-  server.tool(
+  registerWriteTool(
+    server,
     'invariance_session_append_note',
     "Append a freeform text note to an existing session as a custom event with payload {text}. USE THIS WHEN: jotting a thought during a Claude Code task (\"trying approach X next\"), capturing a meeting takeaway, annotating a screen recording, or recording a partial transcript chunk from microphone capture. The note becomes part of the company brain timeline for that session.",
     {
@@ -101,7 +105,8 @@ export function registerSessionTools(server: McpServer, client: InvarianceClient
     },
   );
 
-  server.tool(
+  registerWriteTool(
+    server,
     'invariance_session_attach_run',
     'Attach an existing run to an existing agent-session (PATCH). USE THIS when a Claude Code task that started a session later starts producing a run — call this to link the run\'s graph back to the session timeline so the brain can correlate transcript/notes with operational nodes.',
     {
@@ -117,7 +122,8 @@ export function registerSessionTools(server: McpServer, client: InvarianceClient
     },
   );
 
-  server.tool(
+  registerWriteTool(
+    server,
     'invariance_session_record_summary_to_kb',
     "Persist a summary of an agent-session as a knowledge-base page (so it becomes searchable, durable company brain content beyond the raw session timeline). USE THIS at the END of a Claude Code task, after a meeting wraps, or once a screen-recording has been reviewed — to capture the takeaways. The KB page is created under path 'sessions/<session_id>' by default.",
     {

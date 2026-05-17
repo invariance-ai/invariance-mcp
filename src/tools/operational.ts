@@ -1,13 +1,14 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { InvarianceClient } from '../lib/client.js';
-import { jsonResult, parseJsonArg } from '../lib/util.js';
+import { jsonResult, parseJsonArg, registerReadTool, registerWriteTool } from '../lib/util.js';
 
 export function registerOperationalTools(
   server: McpServer,
   client: InvarianceClient,
 ): void {
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_run_operational_graph',
     'Get the operational graph for a run — entities, edges, findings, and a completeness score (business_object_linked, policy_context_found, owner_found, approval_context_found, downstream_state_change_found).',
     {
@@ -19,7 +20,8 @@ export function registerOperationalTools(
       ),
   );
 
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_run_llm_calls',
     'List LLM calls for a run in append order (paginated). Each entry includes model, tokens, cost, latency, and the underlying node_id.',
     {
@@ -39,7 +41,8 @@ export function registerOperationalTools(
       ),
   );
 
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_run_node_types',
     'List the typed-node kinds present in a run (one row per registered type with a count). Pair with invariance_run_node_type_metrics for per-type aggregates.',
     { run_id: z.string() },
@@ -49,7 +52,8 @@ export function registerOperationalTools(
       ),
   );
 
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_run_node_type_metrics',
     'Aggregate metrics for a single typed-node kind within a run (counts, latency stats, custom-field roll-ups).',
     {
@@ -64,7 +68,8 @@ export function registerOperationalTools(
       ),
   );
 
-  server.tool(
+  registerWriteTool(
+    server,
     'invariance_run_fork',
     'Fork a run from a specific node — creates a new run that branches off the parent at from_node_id. Useful for "what-if" replays during agent debugging.',
     {
@@ -89,7 +94,8 @@ export function registerOperationalTools(
     },
   );
 
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_metrics_overview',
     'Cross-run rollup over a time window: total runs, nodes, errors, cost, latency, etc. Use this to ground "what is happening across my agents" questions.',
     {
@@ -107,7 +113,8 @@ export function registerOperationalTools(
       ),
   );
 
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_metrics_agents',
     'Per-agent usage rollup over a time window: run counts, node counts, cost. Useful for agent-by-agent comparison.',
     {
@@ -125,7 +132,8 @@ export function registerOperationalTools(
       ),
   );
 
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_run_inspect',
     'Composite triage view for a run — fetches run, metrics, narrative, recent nodes, and open findings in parallel and returns {run, metrics, narrative, recent_nodes, open_findings}. Mirrors `inv run inspect`. Best first call when an agent is asked to debug a run.',
     {

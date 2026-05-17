@@ -1,12 +1,13 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { InvarianceClient } from '../lib/client.js';
-import { jsonResult, parseJsonArg } from '../lib/util.js';
+import { jsonResult, parseJsonArg, registerReadTool, registerWriteTool } from '../lib/util.js';
 
 const severityEnum = z.enum(['info', 'low', 'medium', 'high', 'critical']);
 
 export function registerSignalTools(server: McpServer, client: InvarianceClient): void {
-  server.tool(
+  registerWriteTool(
+    server,
     'invariance_signal_emit',
     'Emit a manual signal (alert/notification) — typically attached to a run/node and used to flag noteworthy events for review or downstream automation. severity defaults to "info" if omitted. run_id/node_id auto-fill from INVARIANCE_RUN_ID/INVARIANCE_NODE_ID env vars when present.',
     {
@@ -38,7 +39,8 @@ export function registerSignalTools(server: McpServer, client: InvarianceClient)
     },
   );
 
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_signal_list',
     'List signals visible to the calling agent (paginated, newest first).',
     {
@@ -52,7 +54,8 @@ export function registerSignalTools(server: McpServer, client: InvarianceClient)
       jsonResult(await client.get('/v1/signals', { cursor, limit })),
   );
 
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_signal_get',
     'Get a signal by ID.',
     { id: z.string() },
@@ -64,7 +67,8 @@ export function registerSignalTools(server: McpServer, client: InvarianceClient)
     },
   );
 
-  server.tool(
+  registerWriteTool(
+    server,
     'invariance_signal_acknowledge',
     'Acknowledge a signal — moves status from "open" to "acknowledged" (someone has seen it). Use invariance_signal_resolve to mark fully resolved.',
     { id: z.string() },
@@ -76,7 +80,8 @@ export function registerSignalTools(server: McpServer, client: InvarianceClient)
     },
   );
 
-  server.tool(
+  registerWriteTool(
+    server,
     'invariance_signal_resolve',
     'Resolve a signal — moves status to "resolved" (the underlying issue has been addressed).',
     { id: z.string() },

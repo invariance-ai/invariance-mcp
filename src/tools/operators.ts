@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { InvarianceClient } from '../lib/client.js';
-import { jsonResult } from '../lib/util.js';
+import { jsonResult, registerReadTool, registerWriteTool } from '../lib/util.js';
 
 const operatorType = z
   .enum(['agent', 'human'])
@@ -10,14 +10,16 @@ const operatorType = z
   );
 
 export function registerOperatorTools(server: McpServer, client: InvarianceClient): void {
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_operator_me',
     'Show the operator identity associated with the current credentials. An "operator" is the unified actor model — every Claude Code session, autonomous agent, AND human teammate is an operator. Use this to confirm which operator context the MCP server is acting as (e.g. before recording session events, attaching runs, or writing notes to the company brain).',
     {},
     async () => jsonResult(await client.get('/v1/operators/me')),
   );
 
-  server.tool(
+  registerWriteTool(
+    server,
     'invariance_operator_create',
     "Create a new operator in one of the caller's projects. Operators are the actors whose work shows up in the company brain — create operator_type='agent' for an autonomous worker (Claude Code, a scripted agent, a coding bot) and operator_type='human' for a teammate whose screen recordings, microphone capture, meetings, and Granola notes you want to ingest. Requires a user-session JWT bearer.",
     {
@@ -31,7 +33,8 @@ export function registerOperatorTools(server: McpServer, client: InvarianceClien
     },
   );
 
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_operator_list',
     "List operators inside one of the caller's projects. Filter by operator_type to find all human teammates or all autonomous agents. Requires a user-session JWT bearer.",
     {
@@ -42,7 +45,8 @@ export function registerOperatorTools(server: McpServer, client: InvarianceClien
       jsonResult(await client.get('/v1/operators', { project_id, operator_type })),
   );
 
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_operator_get',
     'Fetch a single operator by ID. Requires a user-session JWT bearer.',
     { id: z.string().describe('Operator ID.') },

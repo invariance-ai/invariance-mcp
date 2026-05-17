@@ -1,12 +1,13 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { InvarianceClient } from '../lib/client.js';
-import { jsonResult } from '../lib/util.js';
+import { jsonResult, registerReadTool, registerWriteTool } from '../lib/util.js';
 
 const statusEnum = z.enum(['open', 'review_requested', 'resolved', 'dismissed']);
 
 export function registerFindingTools(server: McpServer, client: InvarianceClient): void {
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_finding_list',
     'List findings (durable, structured issues raised by monitors or agents) visible to the caller, paginated.',
     {
@@ -20,7 +21,8 @@ export function registerFindingTools(server: McpServer, client: InvarianceClient
       jsonResult(await client.get('/v1/findings', { cursor, limit })),
   );
 
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_finding_get',
     'Get a finding by ID.',
     { id: z.string() },
@@ -32,7 +34,8 @@ export function registerFindingTools(server: McpServer, client: InvarianceClient
     },
   );
 
-  server.tool(
+  registerWriteTool(
+    server,
     'invariance_finding_update',
     'Transition a finding to a new status: "open" (active), "review_requested" (escalated to a human/agent reviewer), "resolved" (fixed), or "dismissed" (intentionally ignored / false positive).',
     {

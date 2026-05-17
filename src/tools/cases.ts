@@ -1,14 +1,15 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { InvarianceClient } from '../lib/client.js';
-import { jsonResult, parseJsonArg } from '../lib/util.js';
+import { jsonResult, parseJsonArg, registerReadTool, registerWriteTool } from '../lib/util.js';
 
 // Cases are workflow instances — they own many runs across time, agents, and
 // humans (one loan, one audit, one claim). Wrap multi-run agentic workflows in
 // a case so tenant/end-user/outcome data is queryable end-to-end.
 
 export function registerCaseTools(server: McpServer, client: InvarianceClient): void {
-  server.tool(
+  registerWriteTool(
+    server,
     'invariance_case_create',
     'Create a workflow-instance Case. A case owns many runs across time, agents, and humans (one loan, one audit, one claim). Returns the case; use its id when starting runs with invariance_run_start to link them.',
     {
@@ -49,7 +50,8 @@ export function registerCaseTools(server: McpServer, client: InvarianceClient): 
     },
   );
 
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_case_get',
     'Get a case by id, including its linked runs (newest first, capped at 100). Use to inspect status, outcome, owner, custom_attrs, and the runs the case has accumulated.',
     { id: z.string().describe('Case id, e.g. "case_abc123".') },
@@ -59,7 +61,8 @@ export function registerCaseTools(server: McpServer, client: InvarianceClient): 
     },
   );
 
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_case_list',
     'List cases visible to the calling agent (paginated). Filter by tenant_id, end_user_id, workflow_key, status ("open" | "closed"), or outcome.',
     {
@@ -74,7 +77,8 @@ export function registerCaseTools(server: McpServer, client: InvarianceClient): 
     async (args) => jsonResult(await client.get('/v1/cases', args)),
   );
 
-  server.tool(
+  registerWriteTool(
+    server,
     'invariance_case_update',
     'Update a case: change owner, merge custom_attrs (shallow), or transition status. Use invariance_case_close for the common "set outcome + close" path.',
     {
@@ -103,7 +107,8 @@ export function registerCaseTools(server: McpServer, client: InvarianceClient): 
     },
   );
 
-  server.tool(
+  registerWriteTool(
+    server,
     'invariance_case_close',
     'Close a case with an outcome — the common path. Equivalent to invariance_case_update with status="closed" + outcome + outcome_value_usd.',
     {

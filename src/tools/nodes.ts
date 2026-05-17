@@ -1,10 +1,11 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { InvarianceClient } from '../lib/client.js';
-import { jsonResult, parseJsonArg } from '../lib/util.js';
+import { jsonResult, parseJsonArg, registerReadTool, registerWriteTool } from '../lib/util.js';
 
 export function registerNodeTools(server: McpServer, client: InvarianceClient): void {
-  server.tool(
+  registerWriteTool(
+    server,
     'invariance_node_write',
     'Append a single node (one unit of work) to an open Invariance run. Use this to record tool calls, LLM calls, logs, context attachments, or handoffs as they happen.',
     {
@@ -42,7 +43,8 @@ export function registerNodeTools(server: McpServer, client: InvarianceClient): 
     },
   );
 
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_node_list',
     'List nodes for a run in append order (paginated).',
     {

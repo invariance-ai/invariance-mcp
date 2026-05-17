@@ -1,10 +1,11 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { InvarianceClient } from '../lib/client.js';
-import { jsonResult, parseJsonArg } from '../lib/util.js';
+import { jsonResult, parseJsonArg, registerReadTool, registerWriteTool } from '../lib/util.js';
 
 export function registerRunTools(server: McpServer, client: InvarianceClient): void {
-  server.tool(
+  registerWriteTool(
+    server,
     'invariance_run_start',
     'Start a new Invariance run (the container for a sequence of nodes). The returned run is in status "open" — you must close it later with invariance_run_finish (success) or invariance_run_fail (error).',
     {
@@ -43,7 +44,8 @@ export function registerRunTools(server: McpServer, client: InvarianceClient): v
     },
   );
 
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_run_get',
     'Get details of an Invariance run (status, metadata, aggregate counts, timestamps).',
     { id: z.string().describe('Run ID, e.g. "run_abc123".') },
@@ -53,7 +55,8 @@ export function registerRunTools(server: McpServer, client: InvarianceClient): v
     },
   );
 
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_run_list',
     'List runs visible to the calling agent in reverse-chronological order (paginated).',
     {
@@ -67,7 +70,8 @@ export function registerRunTools(server: McpServer, client: InvarianceClient): v
       jsonResult(await client.get('/v1/runs', { cursor, limit })),
   );
 
-  server.tool(
+  registerWriteTool(
+    server,
     'invariance_run_finish',
     'Close a run successfully — sets status to "completed". Use this when the agent finished its work without errors. For failures, use invariance_run_fail instead.',
     { id: z.string() },
@@ -80,7 +84,11 @@ export function registerRunTools(server: McpServer, client: InvarianceClient): v
     },
   );
 
-  server.tool(
+  // Symmetric with invariance_run_finish: both are terminal state transitions on
+  // the same resource (PATCH /v1/runs/:id with status). destructiveHint is reserved
+  // for tools that delete data (e.g. kb_page_delete), not state machine transitions.
+  registerWriteTool(
+    server,
     'invariance_run_fail',
     'Close a run with failure — sets status to "failed" and stores the optional error string in metadata.error. Use this when the agent aborted due to an exception or unrecoverable error. For successful completion, use invariance_run_finish.',
     {
@@ -98,7 +106,8 @@ export function registerRunTools(server: McpServer, client: InvarianceClient): v
     },
   );
 
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_run_verify',
     'Verify the cryptographic proof chain for a run — recomputes node hashes and Ed25519 signatures end-to-end. Returns {valid, node_count, head_hash, first_invalid_node_id, reason}.',
     { id: z.string() },
@@ -106,7 +115,8 @@ export function registerRunTools(server: McpServer, client: InvarianceClient): v
       jsonResult(await client.get(`/v1/runs/${encodeURIComponent(id)}/verify`)),
   );
 
-  server.tool(
+  registerReadTool(
+    server,
     'invariance_run_metrics',
     'Aggregate metrics for a run: total_input_tokens, total_output_tokens, total_cache_read/write, total_cost_usd, llm_call_count, tool_call_count, error_count, total_latency_ms.',
     { id: z.string() },
