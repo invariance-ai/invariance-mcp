@@ -63,6 +63,64 @@ export function registerCaseTools(server: McpServer, client: InvarianceClient): 
 
   registerReadTool(
     server,
+    'invariance_case_evidence',
+    'Show normalized evidence for a case: the case, linked runs, nodes, workflow events, actors, and outcome. Use this when you need the full workflow execution record instead of only the case row.',
+    { id: z.string().describe('Case id, e.g. "case_abc123".') },
+    async ({ id }) => jsonResult(await client.get(`/v1/cases/${encodeURIComponent(id)}/evidence`)),
+  );
+
+  registerReadTool(
+    server,
+    'invariance_case_events_list',
+    'List semantic workflow events attached to one case. These are the queryable facts over the run/node evidence layer.',
+    {
+      id: z.string().describe('Case id, e.g. "case_abc123".'),
+      cursor: z.string().optional().describe('opaque pagination token; pass through unchanged'),
+      limit: z.number().int().positive().max(200).optional(),
+    },
+    async ({ id, cursor, limit }) =>
+      jsonResult(await client.get(`/v1/cases/${encodeURIComponent(id)}/events`, { cursor, limit })),
+  );
+
+  registerWriteTool(
+    server,
+    'invariance_case_event_create',
+    'Attach a semantic workflow event to a case, e.g. "support.customer.escalated", "approval.granted", or "docs.received". Prefer this for meaningful workflow facts; keep raw execution trace data in runs/nodes.',
+    {
+      id: z.string().describe('Case id, e.g. "case_abc123".'),
+      type: z.string().min(1).max(128).describe('Dotted semantic event type.'),
+      actor_type: z
+        .enum(['human', 'agent', 'llm', 'service', 'integration', 'policy', 'system'])
+        .optional(),
+      actor_id: z.string().nullable().optional(),
+      payload: z.string().optional().describe('JSON object string for event-specific fields.'),
+      evidence_node_ids: z.array(z.string()).optional().describe('Node ids that justify this event.'),
+      evidence_refs: z
+        .string()
+        .optional()
+        .describe('JSON array of non-node evidence refs: tickets, docs, Slack, GitHub, meetings, URLs.'),
+      occurred_at: z.string().optional().describe('ISO-8601 source timestamp. Defaults to now.'),
+    },
+    async ({ id, type, actor_type, actor_id, payload, evidence_node_ids, evidence_refs, occurred_at }) => {
+      const body: Record<string, unknown> = { type };
+      if (actor_type !== undefined) body.actor_type = actor_type;
+      if (actor_id !== undefined) body.actor_id = actor_id;
+      const parsedPayload = parseJsonArg('payload', payload);
+      if (parsedPayload !== undefined) body.payload = parsedPayload;
+      if (evidence_node_ids !== undefined) body.evidence_node_ids = evidence_node_ids;
+      const parsedRefs = parseJsonArg('evidence_refs', evidence_refs);
+      if (parsedRefs !== undefined) body.evidence_refs = parsedRefs;
+      if (occurred_at !== undefined) body.occurred_at = occurred_at;
+      const res = await client.post<{ event: unknown }>(
+        `/v1/cases/${encodeURIComponent(id)}/events`,
+        body,
+      );
+      return jsonResult(res.event);
+    },
+  );
+
+  registerReadTool(
+    server,
     'invariance_case_list',
     'List cases visible to the calling agent (paginated). Filter by tenant_id, end_user_id, workflow_key, status ("open" | "closed"), or outcome.',
     {

@@ -20,6 +20,7 @@ import { registerEvalTools } from './tools/evals.js';
 import { registerOperatorTools } from './tools/operators.js';
 import { registerSessionTools } from './tools/sessions.js';
 import { registerCaseTools } from './tools/cases.js';
+import { registerWorkflowTools } from './tools/workflows.js';
 import { registerDoctorTool } from './tools/doctor.js';
 
 import { SERVER_NAME, SERVER_VERSION } from './version.js';
@@ -60,6 +61,7 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
   registerOperatorTools(server, client);
   registerSessionTools(server, client);
   registerCaseTools(server, client);
+  registerWorkflowTools(server, client);
   registerDoctorTool(server, client);
   registerLegacyAliases(server, client);
 

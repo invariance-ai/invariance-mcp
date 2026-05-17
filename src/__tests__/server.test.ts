@@ -172,6 +172,100 @@ beforeEach(async () => {
     if (method === 'POST' && url.pathname === '/v1/nodes') {
       return json({ data: [nodeFixture()] }, 201);
     }
+    if (method === 'GET' && url.pathname === '/v1/workflow-definitions') {
+      return json({
+        data: [
+          {
+            key: 'support.escalation',
+            agent_id: 'agent_1',
+            display_name: 'Support Escalation',
+            description: null,
+            expected_fields: [],
+            expected_steps: [],
+            allowed_outcomes: [],
+            custom_metrics: [],
+            created_at: '2026-01-01T00:00:00.000Z',
+            updated_at: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+      });
+    }
+    if (method === 'POST' && url.pathname === '/v1/workflow-definitions') {
+      return json(
+        {
+          definition: {
+            key: body?.key,
+            agent_id: 'agent_1',
+            display_name: body?.display_name,
+            description: body?.description ?? null,
+            expected_fields: body?.expected_fields ?? [],
+            expected_steps: body?.expected_steps ?? [],
+            allowed_outcomes: body?.allowed_outcomes ?? [],
+            custom_metrics: body?.custom_metrics ?? [],
+            created_at: '2026-01-01T00:00:00.000Z',
+            updated_at: '2026-01-01T00:00:00.000Z',
+          },
+        },
+        201,
+      );
+    }
+    if (method === 'GET' && url.pathname === '/v1/workflow-definitions/support.escalation') {
+      return json({
+        definition: {
+          key: 'support.escalation',
+          agent_id: 'agent_1',
+          display_name: 'Support Escalation',
+          description: null,
+          expected_fields: [],
+          expected_steps: [],
+          allowed_outcomes: [],
+          custom_metrics: [],
+          created_at: '2026-01-01T00:00:00.000Z',
+          updated_at: '2026-01-01T00:00:00.000Z',
+        },
+      });
+    }
+    if (method === 'PATCH' && url.pathname === '/v1/workflow-definitions/support.escalation') {
+      return json({
+        definition: {
+          key: 'support.escalation',
+          agent_id: 'agent_1',
+          display_name: body?.display_name ?? 'Support Escalation',
+          description: body?.description ?? null,
+          expected_fields: body?.expected_fields ?? [],
+          expected_steps: body?.expected_steps ?? [],
+          allowed_outcomes: body?.allowed_outcomes ?? [],
+          custom_metrics: body?.custom_metrics ?? [],
+          created_at: '2026-01-01T00:00:00.000Z',
+          updated_at: '2026-01-01T00:00:00.000Z',
+        },
+      });
+    }
+    if (method === 'DELETE' && url.pathname === '/v1/workflow-definitions/support.escalation') {
+      return json({ ok: true });
+    }
+    if (method === 'GET' && url.pathname === '/v1/events') {
+      return json({
+        data: [
+          {
+            id: 'wevt_1',
+            case_id: 'case_1',
+            type: 'support.customer.escalated',
+            payload: {},
+          },
+        ],
+        next_cursor: null,
+      });
+    }
+    if (method === 'GET' && url.pathname === '/v1/cases/case_1/evidence') {
+      return json({ case: { id: 'case_1' }, runs: [runFixture()], events: [] });
+    }
+    if (method === 'GET' && url.pathname === '/v1/cases/case_1/events') {
+      return json({ data: [{ id: 'wevt_1', case_id: 'case_1', type: 'triage.started' }], next_cursor: null });
+    }
+    if (method === 'POST' && url.pathname === '/v1/cases/case_1/events') {
+      return json({ event: { id: 'wevt_2', case_id: 'case_1', ...body } }, 201);
+    }
     if (method === 'POST' && url.pathname === '/v1/signals') {
       return json(
         {
@@ -484,6 +578,12 @@ describe('Invariance MCP server', () => {
       'invariance_session_create', 'invariance_session_list',
       'invariance_session_get', 'invariance_session_append_note',
       'invariance_session_attach_run', 'invariance_session_record_summary_to_kb',
+      'invariance_case_create', 'invariance_case_get', 'invariance_case_list',
+      'invariance_case_update', 'invariance_case_close', 'invariance_case_evidence',
+      'invariance_case_events_list', 'invariance_case_event_create',
+      'invariance_workflow_list', 'invariance_workflow_get', 'invariance_workflow_create',
+      'invariance_workflow_update', 'invariance_workflow_delete',
+      'invariance_workflow_event_list',
       'invariance_doctor',
     ]) {
       expect(names.has(expected), `missing tool ${expected}`).toBe(true);
@@ -1014,6 +1114,70 @@ describe('Invariance MCP server', () => {
       body: '# done',
       kind: 'session_summary',
       metadata: { session_id: 'sess_new' },
+    });
+  });
+
+  it('creates a workflow definition with typed fields', async () => {
+    const result = contentJson(
+      await client.callTool({
+        name: 'invariance_workflow_create',
+        arguments: {
+          key: 'support.escalation',
+          display_name: 'Support Escalation',
+          expected_fields: '[{"name":"priority","type":"enum","enum":["p0","p1"]}]',
+        },
+      }),
+    ) as { key: string; expected_fields: unknown[] };
+    expect(result.key).toBe('support.escalation');
+    expect(result.expected_fields).toEqual([
+      { name: 'priority', type: 'enum', enum: ['p0', 'p1'] },
+    ]);
+    const call = requests.find(
+      (r) => r.method === 'POST' && r.path === '/v1/workflow-definitions',
+    );
+    expect(call?.body).toEqual({
+      key: 'support.escalation',
+      display_name: 'Support Escalation',
+      expected_fields: [{ name: 'priority', type: 'enum', enum: ['p0', 'p1'] }],
+    });
+  });
+
+  it('lists workflow events with filters', async () => {
+    const result = contentJson(
+      await client.callTool({
+        name: 'invariance_workflow_event_list',
+        arguments: { workflow_key: 'support.escalation', actor_type: 'human', limit: 5 },
+      }),
+    ) as { data: unknown[] };
+    expect(result.data).toHaveLength(1);
+    const call = requests.find((r) => r.method === 'GET' && r.path.startsWith('/v1/events?'));
+    expect(call?.path).toBe('/v1/events?limit=5&workflow_key=support.escalation&actor_type=human');
+  });
+
+  it('creates a case workflow event with parsed evidence refs', async () => {
+    const result = contentJson(
+      await client.callTool({
+        name: 'invariance_case_event_create',
+        arguments: {
+          id: 'case_1',
+          type: 'triage.started',
+          actor_type: 'agent',
+          payload: '{"priority":"p0"}',
+          evidence_refs: '[{"kind":"ticket","id":"T-1"}]',
+        },
+      }),
+    ) as { type: string; payload: unknown; evidence_refs: unknown[] };
+    expect(result.type).toBe('triage.started');
+    expect(result.payload).toEqual({ priority: 'p0' });
+    expect(result.evidence_refs).toEqual([{ kind: 'ticket', id: 'T-1' }]);
+    const call = requests.find(
+      (r) => r.method === 'POST' && r.path === '/v1/cases/case_1/events',
+    );
+    expect(call?.body).toEqual({
+      type: 'triage.started',
+      actor_type: 'agent',
+      payload: { priority: 'p0' },
+      evidence_refs: [{ kind: 'ticket', id: 'T-1' }],
     });
   });
 
