@@ -585,6 +585,8 @@ describe('Invariance MCP server', () => {
       'invariance_workflow_update', 'invariance_workflow_delete',
       'invariance_workflow_event_list',
       'invariance_doctor',
+      'cortex_run_job', 'cortex_run_eval', 'cortex_run_counterfactual',
+      'cortex_get_job', 'cortex_get_result',
     ]) {
       expect(names.has(expected), `missing tool ${expected}`).toBe(true);
     }
