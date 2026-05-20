@@ -21,6 +21,7 @@ import { registerOperatorTools } from './tools/operators.js';
 import { registerSessionTools } from './tools/sessions.js';
 import { registerCaseTools } from './tools/cases.js';
 import { registerWorkflowTools } from './tools/workflows.js';
+import { registerCaptureTools } from './tools/captures.js';
 import { registerDoctorTool } from './tools/doctor.js';
 import { registerCortexTools } from './tools/cortex.js';
 
@@ -63,6 +64,7 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
   registerSessionTools(server, client);
   registerCaseTools(server, client);
   registerWorkflowTools(server, client);
+  registerCaptureTools(server, client);
   registerDoctorTool(server, client);
   registerCortexTools(server, client);
   registerLegacyAliases(server, client);
