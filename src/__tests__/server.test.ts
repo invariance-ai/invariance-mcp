@@ -50,6 +50,22 @@ function nodeFixture(id = 'node_1') {
   };
 }
 
+function captureFixture(id = 'cap_1') {
+  return {
+    id,
+    source: 'api',
+    session_type: null,
+    title: null,
+    external_session_id: null,
+    model: null,
+    run_id: null,
+    metadata: {},
+    status: 'open',
+    created_at: '2026-01-01T00:00:00.000Z',
+    updated_at: '2026-01-01T00:00:00.000Z',
+  };
+}
+
 function contentText(result: Awaited<ReturnType<Client['callTool']>>): string {
   const content =
     'content' in result && Array.isArray(result.content)
@@ -489,6 +505,40 @@ beforeEach(async () => {
         },
       });
     }
+    if (method === 'POST' && url.pathname === '/v1/captures') {
+      return json(
+        {
+          session: {
+            ...captureFixture(),
+            source: body?.source ?? 'api',
+            session_type: body?.session_type ?? null,
+            title: body?.title ?? null,
+            external_session_id: body?.external_session_id ?? null,
+            model: body?.model ?? null,
+            run_id: body?.run_id ?? null,
+            metadata: body?.metadata ?? {},
+          },
+        },
+        201,
+      );
+    }
+    if (method === 'GET' && url.pathname === '/v1/captures') {
+      return json({ data: [captureFixture()], next_cursor: null });
+    }
+    if (method === 'GET' && /^\/v1\/captures\/[^/]+$/.test(url.pathname)) {
+      const capId = url.pathname.split('/').pop()!;
+      return json({ session: { ...captureFixture(capId), run_id: null } });
+    }
+    if (method === 'PATCH' && /^\/v1\/captures\/[^/]+$/.test(url.pathname)) {
+      const capId = url.pathname.split('/').pop()!;
+      return json({
+        session: {
+          ...captureFixture(capId),
+          run_id: body?.run_id !== undefined ? body.run_id : null,
+          status: body?.status ?? 'open',
+        },
+      });
+    }
     if (method === 'POST' && url.pathname === '/v1/memory/write') {
       return json({
         access: {
@@ -584,6 +634,9 @@ describe('Invariance MCP server', () => {
       'invariance_workflow_list', 'invariance_workflow_get', 'invariance_workflow_create',
       'invariance_workflow_update', 'invariance_workflow_delete',
       'invariance_workflow_event_list',
+      'invariance_capture_create', 'invariance_capture_list',
+      'invariance_capture_get', 'invariance_capture_update',
+      'invariance_capture_link', 'invariance_capture_links', 'invariance_capture_unlink',
       'invariance_doctor',
       'cortex_run_job', 'cortex_run_eval', 'cortex_run_counterfactual',
       'cortex_get_job', 'cortex_get_result',
@@ -1181,6 +1234,68 @@ describe('Invariance MCP server', () => {
       payload: { priority: 'p0' },
       evidence_refs: [{ kind: 'ticket', id: 'T-1' }],
     });
+  });
+
+  it('creates a capture via invariance_capture_create', async () => {
+    const result = contentJson(
+      await client.callTool({
+        name: 'invariance_capture_create',
+        arguments: {
+          source: 'claude_code',
+          session_type: 'chat',
+          title: 'feat: add captures',
+          metadata: '{"branch":"captures-surfaces"}',
+        },
+      }),
+    ) as { id: string; source: string; session_type: string | null; title: string | null };
+    expect(result.id).toBe('cap_1');
+    expect(result.source).toBe('claude_code');
+    const call = requests.find((r) => r.method === 'POST' && r.path === '/v1/captures');
+    expect(call?.body).toEqual({
+      source: 'claude_code',
+      session_type: 'chat',
+      title: 'feat: add captures',
+      metadata: { branch: 'captures-surfaces' },
+    });
+  });
+
+  it('links a capture to a run via invariance_capture_link', async () => {
+    const result = contentJson(
+      await client.callTool({
+        name: 'invariance_capture_link',
+        arguments: { id: 'cap_1', run_id: 'run_1' },
+      }),
+    ) as { id: string; run_id: string | null };
+    expect(result.id).toBe('cap_1');
+    expect(result.run_id).toBe('run_1');
+    const call = requests.find(
+      (r) => r.method === 'PATCH' && r.path === '/v1/captures/cap_1',
+    );
+    expect(call?.body).toEqual({ run_id: 'run_1' });
+  });
+
+  it('unlinks a capture from its run via invariance_capture_unlink', async () => {
+    await client.callTool({
+      name: 'invariance_capture_unlink',
+      arguments: { id: 'cap_1' },
+    });
+    const call = requests.find(
+      (r) => r.method === 'PATCH' && r.path === '/v1/captures/cap_1',
+    );
+    expect(call?.body).toEqual({ run_id: null });
+  });
+
+  it('returns run_id from invariance_capture_links', async () => {
+    const result = contentJson(
+      await client.callTool({
+        name: 'invariance_capture_links',
+        arguments: { id: 'cap_1' },
+      }),
+    ) as { run_id: string | null };
+    expect(result).toHaveProperty('run_id');
+    expect(
+      requests.some((r) => r.method === 'GET' && r.path === '/v1/captures/cap_1'),
+    ).toBe(true);
   });
 
   it('keeps legacy tool names working', async () => {
