@@ -86,9 +86,15 @@ Add to your Cursor MCP settings (`.cursor/mcp.json`):
 
 ## Available tools
 
-The server exposes **87 tools** (plus 6 legacy aliases) covering Invariance API workflows. Names follow `invariance_<resource>_<action>`.
+The server exposes **106 tools** (plus 6 legacy aliases) covering Invariance API workflows. Names follow `invariance_<resource>_<action>`.
 
 Every tool carries MCP annotations (`readOnlyHint`, `destructiveHint`, `openWorldHint`) so agent clients (Claude Desktop, etc.) can distinguish inspection tools from state-changing ones without parsing prose descriptions.
+
+**Cases** (`invariance_case_*`)
+`create`, `get`, `list`, `update`, `close`, `evidence`, `events_list`, `event_create` — workflow instances that group runs as evidence (create with `workflow_key` / `tenant_id` / `end_user_id`; attach evidence and events; close with an outcome).
+
+**Workflows** (`invariance_workflow_*`)
+`list`, `get`, `create`, `update`, `delete`, `event_list` — the workflow definitions that cases instantiate.
 
 **Runs** (`invariance_run_*`)
 `start`, `get`, `list`, `finish`, `fail`, `verify`, `metrics`, `operational_graph`, `llm_calls`, `node_types`, `node_type_metrics`, `fork`, `inspect`
@@ -127,10 +133,13 @@ Every tool carries MCP annotations (`readOnlyHint`, `destructiveHint`, `openWorl
 `invariance_narrative_get` (LLM-synthesized run summary), `invariance_ask` (turn-based Q&A over your KB + runs), `invariance_kb_pages_list`, `invariance_kb_page_get`, `invariance_kb_page_create`, `invariance_kb_page_update`, `invariance_kb_page_delete`, `invariance_kb_session_create`, `invariance_kb_session_delete`, `invariance_kb_session_list_messages`, `invariance_kb_session_append_message`.
 
 **Operational debugging** — agent-friendly views over runs.
-`invariance_run_operational_graph` (stub: structured `API_NOT_AVAILABLE` until the platform endpoint lands), `invariance_run_llm_calls` (paginated LLM calls for a run), `invariance_run_node_types` / `invariance_run_node_type_metrics` (typed-node aggregates), `invariance_run_fork` (branch a run from a node for replay/what-if), `invariance_run_inspect` (composite triage view: run + metrics + narrative + recent nodes + open findings, mirrors `inv run inspect`).
+`invariance_run_operational_graph` (entities, edges, findings, and a completeness score for a run), `invariance_run_llm_calls` (paginated LLM calls for a run), `invariance_run_node_types` / `invariance_run_node_type_metrics` (typed-node aggregates), `invariance_run_fork` (branch a run from a node for replay/what-if), `invariance_run_inspect` (composite triage view: run + metrics + narrative + recent nodes + open findings, mirrors `inv run inspect`).
 
 **Cross-run metrics**
 `invariance_metrics_overview` (total runs / nodes / errors / cost over a window), `invariance_metrics_agents` (per-agent usage rollup).
+
+**Cortex** (`cortex_*`)
+`cortex_run_job`, `cortex_run_eval`, `cortex_run_counterfactual` (kick off async Cortex jobs), `cortex_get_job`, `cortex_get_result` (poll status / fetch results).
 
 **Health**
 `invariance_doctor` — server + API + auth health check. Mirrors `inv doctor --json`. Use this first when an agent connects to verify its setup before issuing other calls.
