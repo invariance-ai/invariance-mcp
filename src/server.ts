@@ -24,6 +24,7 @@ import { registerWorkflowTools } from './tools/workflows.js';
 import { registerCaptureTools } from './tools/captures.js';
 import { registerDoctorTool } from './tools/doctor.js';
 import { registerCortexTools } from './tools/cortex.js';
+import { registerDnaTools } from './tools/dna.js';
 
 import { SERVER_NAME, SERVER_VERSION } from './version.js';
 export { SERVER_NAME, SERVER_VERSION };
@@ -67,6 +68,7 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
   registerCaptureTools(server, client);
   registerDoctorTool(server, client);
   registerCortexTools(server, client);
+  registerDnaTools(server, client);
   registerLegacyAliases(server, client);
 
   return server;

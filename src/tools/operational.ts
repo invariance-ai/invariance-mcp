@@ -10,7 +10,7 @@ export function registerOperationalTools(
   registerReadTool(
     server,
     'invariance_run_operational_graph',
-    'Get the operational graph for a run — entities, edges, findings, and a completeness score (business_object_linked, policy_context_found, owner_found, approval_context_found, downstream_state_change_found).',
+    'Get the operational graph for a run — entities, edges, findings, a completeness score (business_object_linked, policy_context_found, owner_found, approval_context_found, downstream_state_change_found), and a missing_evidence list naming the unsupported dimensions.',
     {
       run_id: z.string().describe('Run ID, e.g. "run_abc123".'),
     },
