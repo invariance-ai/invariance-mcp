@@ -139,4 +139,56 @@ export function registerWorkflowTools(server: McpServer, client: InvarianceClien
     eventFilters,
     async (args) => jsonResult(await client.get('/v1/events', args)),
   );
+
+  registerWriteTool(
+    server,
+    'invariance_workflow_event_create',
+    'Record a semantic workflow event on a case (e.g. "refund.issued", "approval.approved", "human.handoff"). Links case/run/node evidence + external refs and is bridged into DNA. Pass idempotency_key to make external retries safe.',
+    {
+      case_id: z.string().describe('Case the event belongs to.'),
+      type: z.string().min(1).max(128).describe('Dotted semantic type, e.g. "refund.issued".'),
+      actor_type: z
+        .enum(['human', 'agent', 'llm', 'service', 'integration', 'policy', 'system'])
+        .optional(),
+      actor_id: z.string().optional().describe('Free-form actor id (user, run, slack user, ...).'),
+      payload: z
+        .string()
+        .optional()
+        .describe('JSON object of event detail, e.g. {"amount_usd":42,"ticket":"ZD-1001"}.'),
+      evidence_node_ids: z
+        .string()
+        .optional()
+        .describe('JSON array of node ids in the runs/nodes evidence layer.'),
+      evidence_refs: z
+        .string()
+        .optional()
+        .describe(
+          'JSON array of non-node evidence refs, e.g. [{"kind":"ticket","id":"ZD-1001","url":"https://..."}]. Use kind:"external" for external object refs.',
+        ),
+      idempotency_key: z
+        .string()
+        .max(256)
+        .optional()
+        .describe('Dedup key for repeated external events; re-sending returns the original event.'),
+      occurred_at: z.string().optional().describe('ISO timestamp the fact happened. Defaults to now.'),
+    },
+    async ({ case_id, type, actor_type, actor_id, idempotency_key, occurred_at, ...rest }) => {
+      const body: Record<string, unknown> = { type };
+      if (actor_type !== undefined) body.actor_type = actor_type;
+      if (actor_id !== undefined) body.actor_id = actor_id;
+      if (idempotency_key !== undefined) body.idempotency_key = idempotency_key;
+      if (occurred_at !== undefined) body.occurred_at = occurred_at;
+      const payload = parseJsonArg('payload', rest.payload);
+      if (payload !== undefined) body.payload = payload;
+      const nodeIds = parseJsonArg('evidence_node_ids', rest.evidence_node_ids);
+      if (nodeIds !== undefined) body.evidence_node_ids = nodeIds;
+      const refs = parseJsonArg('evidence_refs', rest.evidence_refs);
+      if (refs !== undefined) body.evidence_refs = refs;
+      const res = await client.post<{ event: unknown }>(
+        `/v1/cases/${encodeURIComponent(case_id)}/events`,
+        body,
+      );
+      return jsonResult(res.event);
+    },
+  );
 }
