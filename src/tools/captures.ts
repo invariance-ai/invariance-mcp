@@ -150,4 +150,63 @@ export function registerCaptureTools(server: McpServer, client: InvarianceClient
       return jsonResult(res.session);
     },
   );
+
+  // Evidence-graph links attach a capture to an execution, workflow event, run,
+  // or node with a typed relationship — richer than the single run_id FK above.
+
+  registerWriteTool(
+    server,
+    'invariance_capture_link_add',
+    'Attach a capture to the workflow evidence graph — an execution (case), workflow event, run, or node — with a typed relationship. Provide at least one target id. Prefer this over invariance_capture_link for non-run targets. Returns the created link.',
+    {
+      id: z.string().describe('Capture id, e.g. "cap_abc123".'),
+      case_id: z.string().optional().describe('Execution (case) id to link to, e.g. "case_abc123".'),
+      workflow_event_id: z.string().optional().describe('Workflow event id to link to.'),
+      run_id: z.string().optional().describe('Run id to link to, e.g. "run_abc123".'),
+      node_id: z.string().optional().describe('Node id to link to.'),
+      link_type: z
+        .enum(['evidence', 'source', 'derived_from', 'mentions', 'related'])
+        .optional()
+        .describe('Relationship type. Defaults to "evidence".'),
+      metadata: z.string().optional().describe('Free-form metadata as a JSON object string.'),
+    },
+    async ({ id, case_id, workflow_event_id, run_id, node_id, link_type, metadata }) => {
+      const body: Record<string, unknown> = {};
+      if (case_id !== undefined) body.case_id = case_id;
+      if (workflow_event_id !== undefined) body.workflow_event_id = workflow_event_id;
+      if (run_id !== undefined) body.run_id = run_id;
+      if (node_id !== undefined) body.node_id = node_id;
+      if (link_type !== undefined) body.link_type = link_type;
+      const meta = parseJsonArg('metadata', metadata);
+      if (meta !== undefined) body.metadata = meta;
+      const res = await client.post<{ link: unknown }>(
+        `/v1/captures/${encodeURIComponent(id)}/links`,
+        body,
+      );
+      return jsonResult(res.link);
+    },
+  );
+
+  registerReadTool(
+    server,
+    'invariance_capture_link_list',
+    'List a capture\'s evidence-graph links (to executions, events, runs, nodes). Returns { links }.',
+    { id: z.string().describe('Capture id, e.g. "cap_abc123".') },
+    async ({ id }) =>
+      jsonResult(await client.get(`/v1/captures/${encodeURIComponent(id)}/links`)),
+  );
+
+  registerWriteTool(
+    server,
+    'invariance_capture_link_remove',
+    'Detach an evidence-graph link from a capture by the link id.',
+    {
+      id: z.string().describe('Capture id, e.g. "cap_abc123".'),
+      link_id: z.string().describe('Link id to remove.'),
+    },
+    async ({ id, link_id }) => {
+      await client.delete(`/v1/captures/${encodeURIComponent(id)}/links/${encodeURIComponent(link_id)}`);
+      return jsonResult({ deleted: link_id });
+    },
+  );
 }

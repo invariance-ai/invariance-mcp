@@ -637,6 +637,7 @@ describe('Invariance MCP server', () => {
       'invariance_capture_create', 'invariance_capture_list',
       'invariance_capture_get', 'invariance_capture_update',
       'invariance_capture_link', 'invariance_capture_links', 'invariance_capture_unlink',
+      'invariance_capture_link_add', 'invariance_capture_link_list', 'invariance_capture_link_remove',
       'invariance_doctor',
       'cortex_run_job', 'cortex_run_eval', 'cortex_run_counterfactual',
       'cortex_get_job', 'cortex_get_result',
