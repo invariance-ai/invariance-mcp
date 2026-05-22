@@ -638,6 +638,8 @@ describe('Invariance MCP server', () => {
       'invariance_capture_get', 'invariance_capture_update',
       'invariance_capture_link', 'invariance_capture_links', 'invariance_capture_unlink',
       'invariance_doctor',
+      'invariance_dna_list_objects', 'invariance_dna_list_object_mentions',
+      'invariance_dna_list_edges', 'invariance_dna_list_edge_candidates',
       'cortex_run_job', 'cortex_run_eval', 'cortex_run_counterfactual',
       'cortex_get_job', 'cortex_get_result',
     ]) {
