@@ -39,8 +39,12 @@ export function registerCaptureTools(server: McpServer, client: InvarianceClient
         .string()
         .optional()
         .describe('Free-form metadata as a JSON object string. Example: {"user_id":"u_42","environment":"prod"}'),
+      tags: z
+        .array(z.string())
+        .optional()
+        .describe('Free-form labels for filtering and evidence-graph rollups, e.g. ["meeting","q3"]. Normalized (trimmed/lowercased/deduped) server-side.'),
     },
-    async ({ source, session_type, capture_type, title, external_session_id, model, run_id, metadata }) => {
+    async ({ source, session_type, capture_type, title, external_session_id, model, run_id, metadata, tags }) => {
       const body: Record<string, unknown> = { source };
       const stype = session_type ?? capture_type;
       if (stype !== undefined) body.session_type = stype;
@@ -50,6 +54,7 @@ export function registerCaptureTools(server: McpServer, client: InvarianceClient
       if (run_id !== undefined) body.run_id = run_id;
       const meta = parseJsonArg('metadata', metadata);
       if (meta !== undefined) body.metadata = meta;
+      if (tags !== undefined) body.tags = tags;
       const res = await client.post<{ session: unknown }>('/v1/captures', body);
       return jsonResult(res.session);
     },
@@ -58,13 +63,14 @@ export function registerCaptureTools(server: McpServer, client: InvarianceClient
   registerReadTool(
     server,
     'invariance_capture_list',
-    'List captures (paginated). Captures are standalone evidence; they don\'t need an execution upfront. Filter by project_id, operator_id, session_type, source, or run_id.',
+    'List captures (paginated). Captures are standalone evidence; they don\'t need an execution upfront. Filter by project_id, operator_id, session_type, source, run_id, or tags.',
     {
       project_id: z.string().optional(),
       operator_id: z.string().optional(),
       session_type: z.string().optional(),
       source: z.string().optional(),
       run_id: z.string().optional(),
+      tags: z.string().optional().describe('Comma-separated tags; matches captures containing ALL of them, e.g. "meeting,q3".'),
       cursor: z.string().optional().describe('Opaque pagination token from previous response next_cursor; pass through unchanged.'),
       limit: z.number().int().positive().max(200).optional(),
     },
@@ -91,13 +97,15 @@ export function registerCaptureTools(server: McpServer, client: InvarianceClient
       status: z.string().optional().describe('New status for the capture, e.g. "open", "closed".'),
       run_id: z.string().nullable().optional().describe('Run to link this capture to; pass null to unlink.'),
       metadata: z.string().optional().describe('JSON object string; shallow-merged with existing metadata.'),
+      tags: z.array(z.string()).optional().describe('Replaces the tag set. Normalized server-side. Pass [] to clear.'),
     },
-    async ({ id, status, run_id, metadata }) => {
+    async ({ id, status, run_id, metadata, tags }) => {
       const body: Record<string, unknown> = {};
       if (status !== undefined) body.status = status;
       if (run_id !== undefined) body.run_id = run_id;
       const meta = parseJsonArg('metadata', metadata);
       if (meta !== undefined) body.metadata = meta;
+      if (tags !== undefined) body.tags = tags;
       const res = await client.patch<{ session: unknown }>(
         `/v1/captures/${encodeURIComponent(id)}`,
         body,
