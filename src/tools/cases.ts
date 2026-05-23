@@ -32,18 +32,23 @@ export function registerCaseTools(server: McpServer, client: InvarianceClient): 
         .string()
         .optional()
         .describe('JSON object string of domain attributes (e.g. {"loan_id":"L_1","amount":250000}).'),
+      tags: z
+        .array(z.string())
+        .optional()
+        .describe('Free-form labels for filtering and rollups, e.g. ["urgent","vip"]. Normalized (trimmed/lowercased/deduped) server-side.'),
       opened_at: z
         .string()
         .optional()
         .describe('ISO-8601 timestamp when the case opened in the source system. Defaults to now.'),
     },
-    async ({ workflow_key, tenant_id, end_user_id, owner, custom_attrs, opened_at }) => {
+    async ({ workflow_key, tenant_id, end_user_id, owner, custom_attrs, tags, opened_at }) => {
       const body: Record<string, unknown> = { workflow_key };
       if (tenant_id !== undefined) body.tenant_id = tenant_id;
       if (end_user_id !== undefined) body.end_user_id = end_user_id;
       if (owner !== undefined) body.owner = owner;
       const attrs = parseJsonArg('custom_attrs', custom_attrs);
       if (attrs !== undefined) body.custom_attrs = attrs;
+      if (tags !== undefined) body.tags = tags;
       if (opened_at !== undefined) body.opened_at = opened_at;
       const res = await client.post<{ case: unknown }>('/v1/cases', body);
       return jsonResult(res.case);
@@ -99,9 +104,10 @@ export function registerCaseTools(server: McpServer, client: InvarianceClient): 
         .string()
         .optional()
         .describe('JSON array of non-node evidence refs: tickets, docs, Slack, GitHub, meetings, URLs.'),
+      tags: z.array(z.string()).optional().describe('Free-form labels for filtering and rollups. Normalized server-side.'),
       occurred_at: z.string().optional().describe('ISO-8601 source timestamp. Defaults to now.'),
     },
-    async ({ id, type, actor_type, actor_id, payload, evidence_node_ids, evidence_refs, occurred_at }) => {
+    async ({ id, type, actor_type, actor_id, payload, evidence_node_ids, evidence_refs, tags, occurred_at }) => {
       const body: Record<string, unknown> = { type };
       if (actor_type !== undefined) body.actor_type = actor_type;
       if (actor_id !== undefined) body.actor_id = actor_id;
@@ -110,6 +116,7 @@ export function registerCaseTools(server: McpServer, client: InvarianceClient): 
       if (evidence_node_ids !== undefined) body.evidence_node_ids = evidence_node_ids;
       const parsedRefs = parseJsonArg('evidence_refs', evidence_refs);
       if (parsedRefs !== undefined) body.evidence_refs = parsedRefs;
+      if (tags !== undefined) body.tags = tags;
       if (occurred_at !== undefined) body.occurred_at = occurred_at;
       const res = await client.post<{ event: unknown }>(
         `/v1/cases/${encodeURIComponent(id)}/events`,
@@ -122,7 +129,7 @@ export function registerCaseTools(server: McpServer, client: InvarianceClient): 
   registerReadTool(
     server,
     'invariance_case_list',
-    'List cases visible to the calling agent (paginated). Filter by tenant_id, end_user_id, workflow_key, status ("open" | "closed"), or outcome.',
+    'List cases visible to the calling agent (paginated). Filter by tenant_id, end_user_id, workflow_key, status ("open" | "closed"), outcome, or tags.',
     {
       cursor: z.string().optional().describe('opaque pagination token; pass through unchanged'),
       limit: z.number().int().positive().max(200).optional(),
@@ -131,6 +138,7 @@ export function registerCaseTools(server: McpServer, client: InvarianceClient): 
       workflow_key: z.string().optional(),
       status: z.enum(['open', 'closed']).optional(),
       outcome: z.string().optional(),
+      tags: z.string().optional().describe('Comma-separated tags; matches cases containing ALL of them, e.g. "urgent,vip".'),
     },
     async (args) => jsonResult(await client.get('/v1/cases', args)),
   );
@@ -146,9 +154,10 @@ export function registerCaseTools(server: McpServer, client: InvarianceClient): 
       outcome_value_usd: z.number().nullable().optional().describe('Realized $ value (positive) or loss (negative).'),
       owner: z.string().max(128).nullable().optional(),
       custom_attrs: z.string().optional().describe('JSON object string; shallow-merged with existing attrs.'),
+      tags: z.array(z.string()).optional().describe('Replaces the tag set. Normalized server-side. Pass [] to clear.'),
       closed_at: z.string().nullable().optional(),
     },
-    async ({ id, status, outcome, outcome_value_usd, owner, custom_attrs, closed_at }) => {
+    async ({ id, status, outcome, outcome_value_usd, owner, custom_attrs, tags, closed_at }) => {
       const body: Record<string, unknown> = {};
       if (status !== undefined) body.status = status;
       if (outcome !== undefined) body.outcome = outcome;
@@ -156,6 +165,7 @@ export function registerCaseTools(server: McpServer, client: InvarianceClient): 
       if (owner !== undefined) body.owner = owner;
       const attrs = parseJsonArg('custom_attrs', custom_attrs);
       if (attrs !== undefined) body.custom_attrs = attrs;
+      if (tags !== undefined) body.tags = tags;
       if (closed_at !== undefined) body.closed_at = closed_at;
       const res = await client.patch<{ case: unknown }>(
         `/v1/cases/${encodeURIComponent(id)}`,
