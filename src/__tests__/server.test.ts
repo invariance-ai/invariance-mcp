@@ -525,6 +525,31 @@ beforeEach(async () => {
     if (method === 'GET' && url.pathname === '/v1/captures') {
       return json({ data: [captureFixture()], next_cursor: null });
     }
+    if (method === 'POST' && /^\/v1\/captures\/[^/]+\/links$/.test(url.pathname)) {
+      const capId = url.pathname.split('/')[3]!;
+      return json(
+        {
+          link: {
+            id: 'lnk_1',
+            capture_id: capId,
+            run_id: body?.target_type === 'run' || body?.run_id ? (body?.target_id ?? body?.run_id) : null,
+            case_id: body?.target_type === 'case' ? body?.target_id : null,
+            workflow_event_id: body?.target_type === 'workflow_event' ? body?.target_id : null,
+            node_id: body?.target_type === 'node' ? body?.target_id : null,
+            link_type: body?.link_type ?? 'evidence',
+            metadata: body?.metadata ?? {},
+            created_at: '2026-05-07T12:00:00Z',
+          },
+        },
+        201,
+      );
+    }
+    if (method === 'GET' && /^\/v1\/captures\/[^/]+\/links$/.test(url.pathname)) {
+      return json({ links: [{ id: 'lnk_1', run_id: 'run_77', case_id: null }] });
+    }
+    if (method === 'DELETE' && /^\/v1\/captures\/[^/]+\/links\/[^/]+$/.test(url.pathname)) {
+      return json(null, 204);
+    }
     if (method === 'GET' && /^\/v1\/captures\/[^/]+$/.test(url.pathname)) {
       const capId = url.pathname.split('/').pop()!;
       return json({ session: { ...captureFixture(capId), run_id: null } });
@@ -1287,16 +1312,54 @@ describe('Invariance MCP server', () => {
     expect(call?.body).toEqual({ run_id: null });
   });
 
-  it('returns run_id from invariance_capture_links', async () => {
+  it('lists evidence links from invariance_capture_links', async () => {
     const result = contentJson(
       await client.callTool({
         name: 'invariance_capture_links',
         arguments: { id: 'cap_1' },
       }),
-    ) as { run_id: string | null };
-    expect(result).toHaveProperty('run_id');
+    ) as { links: Array<{ id: string }> };
+    expect(result.links[0].id).toBe('lnk_1');
     expect(
-      requests.some((r) => r.method === 'GET' && r.path === '/v1/captures/cap_1'),
+      requests.some((r) => r.method === 'GET' && r.path === '/v1/captures/cap_1/links'),
+    ).toBe(true);
+  });
+
+  it('creates a polymorphic link via invariance_capture_link', async () => {
+    const result = contentJson(
+      await client.callTool({
+        name: 'invariance_capture_link',
+        arguments: { id: 'cap_1', target_type: 'case', target_id: 'case_2', link_type: 'evidence' },
+      }),
+    ) as { id: string; case_id: string | null };
+    expect(result.id).toBe('lnk_1');
+    expect(result.case_id).toBe('case_2');
+    const call = requests.find(
+      (r) => r.method === 'POST' && r.path === '/v1/captures/cap_1/links',
+    );
+    expect(call?.body).toEqual({ target_type: 'case', target_id: 'case_2', link_type: 'evidence' });
+  });
+
+  it('defaults target_type to run when only target_id is given', async () => {
+    await client.callTool({
+      name: 'invariance_capture_link',
+      arguments: { id: 'cap_1', target_id: 'run_5' },
+    });
+    const call = requests.find(
+      (r) => r.method === 'POST' && r.path === '/v1/captures/cap_1/links',
+    );
+    expect(call?.body).toMatchObject({ target_type: 'run', target_id: 'run_5' });
+  });
+
+  it('detaches a specific link via invariance_capture_unlink with link_id', async () => {
+    await client.callTool({
+      name: 'invariance_capture_unlink',
+      arguments: { id: 'cap_1', link_id: 'lnk_1' },
+    });
+    expect(
+      requests.some(
+        (r) => r.method === 'DELETE' && r.path === '/v1/captures/cap_1/links/lnk_1',
+      ),
     ).toBe(true);
   });
 

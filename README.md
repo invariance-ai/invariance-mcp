@@ -123,6 +123,9 @@ Every tool carries MCP annotations (`readOnlyHint`, `destructiveHint`, `openWorl
 **Sessions** (`invariance_session_*`)
 `create`, `list`, `get`, `append_note`, `attach_run`, `record_summary_to_kb` — capture sessions that group runs, notes, and KB summaries under a single operator's work.
 
+**Captures** (`invariance_capture_*`)
+`create`, `list`, `get`, `update`, `link`, `links`, `unlink` — standalone evidence (sessions, conversations, traces). `link` attaches a capture to any evidence-graph target: pass `run_id` for the legacy run link, or `target_type` (`run` | `case` | `workflow_event` | `node`, defaults to `run`) + `target_id` to create a richer link with an optional `link_type`. `links` lists all links; `unlink` takes `link_id` to detach a specific link (or clears `run_id` when omitted).
+
 **Memory** (`invariance_memory_*`)
 `read`, `write` — record what the agent looked up or wrote about a subject (customer, account, policy, …).
 

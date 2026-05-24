@@ -117,12 +117,33 @@ export function registerCaptureTools(server: McpServer, client: InvarianceClient
   registerWriteTool(
     server,
     'invariance_capture_link',
-    'Link a capture to a run. Captures are standalone evidence; they don\'t need an execution upfront. This is equivalent to invariance_capture_update with run_id set.',
+    'Link a capture to an evidence-graph target (run/case/workflow_event/node). With only run_id this sets the capture\'s run_id (legacy, equivalent to invariance_capture_update). With target_id it creates a richer capture link; target_type defaults to "run". Captures are standalone evidence and don\'t need an execution upfront.',
     {
       id: z.string().describe('Capture id, e.g. "cap_abc123".'),
-      run_id: z.string().describe('Run id to link this capture to, e.g. "run_abc123".'),
+      run_id: z.string().optional().describe('Legacy: link to a run by setting run_id (PATCH).'),
+      target_type: z
+        .enum(['run', 'case', 'workflow_event', 'node'])
+        .optional()
+        .describe('Kind of target to link to. Defaults to "run".'),
+      target_id: z.string().optional().describe('Id of the target to link; creates a capture link.'),
+      link_type: z
+        .enum(['evidence', 'source', 'derived_from', 'mentions', 'related'])
+        .optional()
+        .describe('Relationship the link expresses. Defaults to "evidence" server-side.'),
     },
-    async ({ id, run_id }) => {
+    async ({ id, run_id, target_type, target_id, link_type }) => {
+      if (target_id !== undefined) {
+        const body: Record<string, unknown> = { target_type: target_type ?? 'run', target_id };
+        if (link_type !== undefined) body.link_type = link_type;
+        const res = await client.post<{ link: unknown }>(
+          `/v1/captures/${encodeURIComponent(id)}/links`,
+          body,
+        );
+        return jsonResult(res.link);
+      }
+      if (run_id === undefined) {
+        throw new Error('Provide either run_id (legacy) or target_id.');
+      }
       const res = await client.patch<{ session: unknown }>(
         `/v1/captures/${encodeURIComponent(id)}`,
         { run_id },
@@ -134,23 +155,29 @@ export function registerCaptureTools(server: McpServer, client: InvarianceClient
   registerReadTool(
     server,
     'invariance_capture_links',
-    'Get the run linked to a capture, returning { run_id }. Captures are standalone evidence; they don\'t need an execution upfront; link a capture to a run later with invariance_capture_link.',
+    'List every evidence link on a capture (case/run/workflow_event/node), returning { links }. Captures are standalone evidence; link a capture to a target with invariance_capture_link.',
     { id: z.string().describe('Capture id, e.g. "cap_abc123".') },
     async ({ id }) => {
-      const res = await client.get<{ session: { run_id?: unknown } }>(
-        `/v1/captures/${encodeURIComponent(id)}`,
+      const res = await client.get<{ links: unknown[] }>(
+        `/v1/captures/${encodeURIComponent(id)}/links`,
       );
-      const session = res.session as Record<string, unknown>;
-      return jsonResult({ run_id: session.run_id ?? null });
+      return jsonResult({ links: res.links ?? [] });
     },
   );
 
   registerWriteTool(
     server,
     'invariance_capture_unlink',
-    'Unlink a capture from its run by setting run_id to null. Captures are standalone evidence; they don\'t need an execution upfront.',
-    { id: z.string().describe('Capture id, e.g. "cap_abc123".') },
-    async ({ id }) => {
+    'Detach a capture link. With link_id, deletes that specific evidence link. Without link_id, clears the capture\'s run_id (legacy). Captures are standalone evidence; they don\'t need an execution upfront.',
+    {
+      id: z.string().describe('Capture id, e.g. "cap_abc123".'),
+      link_id: z.string().optional().describe('Specific capture link id to detach. Omit to clear run_id (legacy).'),
+    },
+    async ({ id, link_id }) => {
+      if (link_id !== undefined) {
+        await client.delete(`/v1/captures/${encodeURIComponent(id)}/links/${encodeURIComponent(link_id)}`);
+        return jsonResult({ id, detached: link_id });
+      }
       const res = await client.patch<{ session: unknown }>(
         `/v1/captures/${encodeURIComponent(id)}`,
         { run_id: null },
