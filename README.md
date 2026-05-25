@@ -86,7 +86,9 @@ Add to your Cursor MCP settings (`.cursor/mcp.json`):
 
 ## Available tools
 
-The server exposes **106 tools** (plus 6 legacy aliases) covering Invariance API workflows. Names follow `invariance_<resource>_<action>`.
+The server exposes **150 tools** (plus 6 legacy aliases) covering Invariance API workflows. Names follow `invariance_<resource>_<action>`.
+
+See [`../COVERAGE_MATRIX.md`](../COVERAGE_MATRIX.md) for the cross-surface (TS / Python / CLI / MCP) coverage matrix, and [`AGENTS.md`](./AGENTS.md) for an agent-facing tool guide.
 
 Every tool carries MCP annotations (`readOnlyHint`, `destructiveHint`, `openWorldHint`) so agent clients (Claude Desktop, etc.) can distinguish inspection tools from state-changing ones without parsing prose descriptions.
 
@@ -140,6 +142,24 @@ Every tool carries MCP annotations (`readOnlyHint`, `destructiveHint`, `openWorl
 
 **Cross-run metrics**
 `invariance_metrics_overview` (total runs / nodes / errors / cost over a window), `invariance_metrics_agents` (per-agent usage rollup).
+
+**Workflow observability** (`invariance_workflow_observability_*`) — read
+`list` (rollups across all workflows), `get` (one workflow's rollup), `executions` (per-execution health: status, stale flag, reasons, evidence mix). All read-only.
+
+**Divergences** (`invariance_divergence_*`)
+`list` (read; filter by run/kind/severity/status), `get` (read), `update` (write — transition status: open | accepted | dismissed | converted_to_monitor).
+
+**Saved views** (`invariance_saved_view_*`)
+`list` (read), `get` (read), `create` (write), `update` (write), `run` (write — pass EITHER `saved_view_id` OR `source`+`spec`), `delete` (destructive).
+
+**Receipts** (`invariance_receipt_*`)
+`create` (write), `batch` (write), `list` (read), `get` (read) — proofs that external actions happened. **`create` and `batch` require an agent API key** (operator tokens get 403).
+
+**Guardrails** (`invariance_guardrail_*`)
+`list` (read; filter by status/recipe_id), `get` (read), `create` (write), `update` (write), `promote` (write — lifecycle: suggested → accepted → shadow → active_monitor → rejected).
+
+**Recipes** (`invariance_recipe_*`)
+`list` (read), `get` (read; by ID or slug), `update` (write — `enabled`, `default_mode`). Built-in operational-check registry; promote one into a guardrail with `invariance_guardrail_create`.
 
 **Cortex** (`cortex_*`)
 `cortex_run_job`, `cortex_run_eval`, `cortex_run_counterfactual` (kick off async Cortex jobs), `cortex_get_job`, `cortex_get_result` (poll status / fetch results).
