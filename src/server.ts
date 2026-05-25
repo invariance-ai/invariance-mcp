@@ -25,6 +25,12 @@ import { registerCaptureTools } from './tools/captures.js';
 import { registerDoctorTool } from './tools/doctor.js';
 import { registerCortexTools } from './tools/cortex.js';
 import { registerDnaTools } from './tools/dna.js';
+import { registerWorkflowObservabilityTools } from './tools/workflow-observability.js';
+import { registerDivergenceTools } from './tools/divergences.js';
+import { registerSavedViewTools } from './tools/saved-views.js';
+import { registerReceiptTools } from './tools/receipts.js';
+import { registerGuardrailTools } from './tools/guardrails.js';
+import { registerRecipeTools } from './tools/recipes.js';
 
 import { SERVER_NAME, SERVER_VERSION } from './version.js';
 export { SERVER_NAME, SERVER_VERSION };
@@ -69,6 +75,12 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
   registerDoctorTool(server, client);
   registerCortexTools(server, client);
   registerDnaTools(server, client);
+  registerWorkflowObservabilityTools(server, client);
+  registerDivergenceTools(server, client);
+  registerSavedViewTools(server, client);
+  registerReceiptTools(server, client);
+  registerGuardrailTools(server, client);
+  registerRecipeTools(server, client);
   registerLegacyAliases(server, client);
 
   return server;
