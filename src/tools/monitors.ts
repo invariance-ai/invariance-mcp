@@ -158,4 +158,37 @@ export function registerMonitorTools(server: McpServer, client: InvarianceClient
         }),
       ),
   );
+
+  // Preview tools are READ-only: the backend dry-runs the target/evaluator
+  // against history and never writes signals, findings, or reviews. Use these
+  // to validate a monitor spec before saving or enabling it.
+  registerReadTool(
+    server,
+    'invariance_monitor_preview_target',
+    'Dry-run a monitor target against history to see which runs/nodes it would inspect. Writes nothing. Returns {run_ids, node_ids, counts:{runs,nodes}, truncated}.',
+    {
+      body: z.string().describe(
+        'JSON object string with one of {target} or {monitor_id}, plus optional sample_limit. target shape matches create: {"kind":"current_run"} | {"kind":"specific_run","run_id":"run_..."} | {"kind":"agent_history","filters":[...]}. Example: {"target":{"kind":"agent_history","filters":[{"field":"environment","operator":"eq","value":"prod"}]},"sample_limit":100}',
+      ),
+    },
+    async ({ body }) => {
+      const parsed = parseJsonArg('body', body);
+      return jsonResult(await client.post('/v1/monitors/preview-target', parsed));
+    },
+  );
+
+  registerReadTool(
+    server,
+    'invariance_monitor_preview_evaluator',
+    'Dry-run a monitor evaluator against history to see which nodes it would match and why. Writes nothing. Returns {sampled, matched, matches:[{run_id,node_id,matched,reason,observed_value?}]}.',
+    {
+      body: z.string().describe(
+        'JSON object string with {evaluator} (required, same shape as create) plus optional target and sample_limit. Example: {"evaluator":{"type":"keyword","field":"output.text","keywords":["refund"]},"target":{"kind":"current_run"}}',
+      ),
+    },
+    async ({ body }) => {
+      const parsed = parseJsonArg('body', body);
+      return jsonResult(await client.post('/v1/monitors/preview-evaluator', parsed));
+    },
+  );
 }
