@@ -34,12 +34,12 @@ function nodeFixture(id = 'node_1') {
     run_id: 'run_1',
     agent_id: 'agent_1',
     parent_id: null,
-    action_type: 'tool_call',
-    type: null,
+    action_type: 'stripe.refunds.create',
+    type: 'tool_call',
     input: null,
-    output: null,
+    output: { text: 'Refund created' },
     error: null,
-    metadata: {},
+    metadata: { tool_name: 'stripe.refunds.create', words_created: 2 },
     custom_fields: {},
     timestamp: 1,
     duration_ms: null,
@@ -976,11 +976,17 @@ describe('Invariance MCP server', () => {
       run: { id?: string } | null;
       metrics: { metrics?: unknown } | null;
       narrative: { summary?: string } | null;
+      observability: { step_count: number; tool_call_count: number; total_words_created: number };
       recent_nodes: unknown[];
       open_findings: Array<{ id: string }>;
     };
     expect(result.run?.id).toBe('run_1');
     expect(result.narrative?.summary).toBe('all good');
+    expect(result.observability).toMatchObject({
+      step_count: 1,
+      tool_call_count: 1,
+      total_words_created: 2,
+    });
     expect(result.recent_nodes.length).toBe(1);
     // open_findings filters to status=open AND run_id=run_1
     expect(result.open_findings.map((f) => f.id)).toEqual(['find_1']);

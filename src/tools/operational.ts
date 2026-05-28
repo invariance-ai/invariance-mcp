@@ -3,6 +3,80 @@ import { z } from 'zod';
 import type { InvarianceClient } from '../lib/client.js';
 import { jsonResult, parseJsonArg, registerReadTool, registerWriteTool } from '../lib/util.js';
 
+interface NodeLike {
+  id: string;
+  action_type: string;
+  type?: string | null;
+  metadata?: Record<string, unknown>;
+  output?: unknown;
+  error?: unknown;
+  duration_ms?: number | null;
+}
+
+function summarizeRunObservability(runId: string, nodes: NodeLike[]) {
+  const steps = nodes.map((node) => {
+    const metadata = node.metadata ?? {};
+    const llm = readObject(metadata.llm);
+    const output = readObject(node.output);
+    return {
+      node_id: node.id,
+      action_type: node.action_type,
+      type: node.type ?? null,
+      kind: kindForNode(node),
+      status: node.error == null ? 'ok' : 'error',
+      input_tokens: readNumber(llm.input_tokens),
+      output_tokens: readNumber(llm.output_tokens),
+      cache_read_tokens: readNumber(llm.cache_read_tokens),
+      cache_write_tokens: readNumber(llm.cache_write_tokens),
+      words_created:
+        readNumber(metadata.words_created) ||
+        readNumber(output.words_created) ||
+        countWords(typeof output.text === 'string' ? output.text : null),
+      duration_ms: node.duration_ms ?? null,
+    };
+  });
+  const sum = (key: keyof (typeof steps)[number]) =>
+    steps.reduce((acc, step) => {
+      const value = step[key];
+      return acc + (typeof value === 'number' ? value : 0);
+    }, 0);
+  return {
+    run_id: runId,
+    step_count: nodes.length,
+    llm_call_count: steps.filter((s) => s.kind === 'llm').length,
+    tool_call_count: steps.filter((s) => s.kind === 'tool').length,
+    error_count: steps.filter((s) => s.status === 'error').length,
+    total_input_tokens: sum('input_tokens'),
+    total_output_tokens: sum('output_tokens'),
+    total_cache_read_tokens: sum('cache_read_tokens'),
+    total_cache_write_tokens: sum('cache_write_tokens'),
+    total_words_created: sum('words_created'),
+    total_duration_ms: sum('duration_ms'),
+    steps,
+  };
+}
+
+function kindForNode(node: NodeLike): 'llm' | 'tool' | 'message' | 'step' {
+  const metadata = node.metadata ?? {};
+  if (node.type === 'llm_call' || node.action_type.startsWith('llm.')) return 'llm';
+  if (node.type === 'tool_call' || metadata.tool_name != null) return 'tool';
+  if (node.type === 'message' || node.action_type.includes('message') || node.action_type.includes('prompt')) return 'message';
+  return 'step';
+}
+
+function readObject(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' ? value as Record<string, unknown> : {};
+}
+
+function readNumber(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+function countWords(text: string | null): number {
+  if (!text) return 0;
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
 export function registerOperationalTools(
   server: McpServer,
   client: InvarianceClient,
@@ -163,11 +237,11 @@ export function registerOperationalTools(
           .then((r) => r.narrative)
           .catch(() => null),
         client
-          .get<{ data: unknown[]; next_cursor: string | null }>(
+          .get<{ data: NodeLike[]; next_cursor: string | null }>(
             `/v1/runs/${encodeURIComponent(id)}/nodes`,
             { limit: lim },
           )
-          .catch(() => ({ data: [] as unknown[], next_cursor: null })),
+          .catch(() => ({ data: [] as NodeLike[], next_cursor: null })),
         client
           .get<{ data: Array<{ run_id?: string; status?: string }>; next_cursor: string | null }>(
             '/v1/findings',
@@ -187,6 +261,7 @@ export function registerOperationalTools(
         run,
         metrics,
         narrative,
+        observability: summarizeRunObservability(id, nodesPage.data ?? []),
         recent_nodes: nodesPage.data ?? [],
         open_findings,
       });
