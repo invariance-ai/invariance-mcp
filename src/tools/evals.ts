@@ -191,7 +191,10 @@ export function registerEvalTools(server: McpServer, client: InvarianceClient): 
     {
       suite_id: z.string(),
       body: z.string().describe(
-        'CreateEvalCaseFromRunRequest as a JSON object string. Required: run_id (string). Optional: node_id (string — pick a specific node), metadata (object). Example: {"run_id":"run_abc123"}',
+        'CreateEvalCaseFromRunRequest as a JSON object string. Required: source_run_id (string). ' +
+          'Optional: name (string), source_finding_id / source_signal_id (string — provenance; ' +
+          "their evidence is copied into the case metadata), expected (object), assertions (array), " +
+          'mutations (array), metadata (object). Example: {"source_run_id":"run_abc123","source_signal_id":"sig_1"}',
       ),
     },
     async ({ suite_id, body }) => {

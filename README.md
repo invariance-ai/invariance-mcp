@@ -28,7 +28,7 @@ npx @invariance/mcp
 | `INVARIANCE_MCP_PORT` | No | `3000` | Port for SSE/HTTP transport |
 | `INVARIANCE_TIMEOUT` | No | `30000` | Request timeout in milliseconds |
 
-Get your API key at [app.useinvariance.com/settings/api-keys](https://app.useinvariance.com/settings/api-keys).
+Get your API key at [platform.useinvariance.com/settings/api-keys](https://platform.useinvariance.com/settings/api-keys). For headless agents, issue a one-time bootstrap token from the dashboard and redeem it with `inv login --bootstrap <token>` before starting the MCP server.
 
 ### Claude Desktop
 
@@ -91,6 +91,20 @@ The server exposes **150 tools** (plus 6 legacy aliases) covering Invariance API
 See [`../COVERAGE_MATRIX.md`](../COVERAGE_MATRIX.md) for the cross-surface (TS / Python / CLI / MCP) coverage matrix, and [`AGENTS.md`](./AGENTS.md) for an agent-facing tool guide.
 
 Every tool carries MCP annotations (`readOnlyHint`, `destructiveHint`, `openWorldHint`) so agent clients (Claude Desktop, etc.) can distinguish inspection tools from state-changing ones without parsing prose descriptions.
+
+## Recommended tool-calling workflow
+
+For instrumentation setup, make this the default sequence in agent instructions:
+
+1. Call `invariance_doctor` to verify the API key and platform reachability.
+2. Create or reuse a workflow instance with `invariance_case_create`.
+3. Start a run linked to that case with `invariance_run_start`.
+4. Call `invariance_node_write` for each LLM call, tool call, retrieval, decision, handoff, external action, and error.
+5. Call `invariance_workflow_event_create` for semantic business facts operators should filter on.
+6. Finish or fail the run with `invariance_run_finish` or `invariance_run_fail`.
+7. Inspect `invariance_workflow_observability_get`, create useful dashboard panels with `invariance_saved_view_create`, and ask Cortex with `cortex_ask`.
+
+Good first saved views are task usage by `action_type`, failed tool calls, cost by model, stale open executions, review queue by severity, and workflow outcomes. Cortex can also suggest dashboard panels; ask it what a workflow operator should see, inspect the SQL-like structured query shape, then persist the useful query as a saved view.
 
 **Cases** (`invariance_case_*`)
 `create`, `get`, `list`, `update`, `close`, `evidence`, `events_list`, `event_create` — workflow instances that group runs as evidence (create with `workflow_key` / `tenant_id` / `end_user_id`; attach evidence and events; close with an outcome).
@@ -162,7 +176,7 @@ Every tool carries MCP annotations (`readOnlyHint`, `destructiveHint`, `openWorl
 `list` (read), `get` (read; by ID or slug), `update` (write — `enabled`, `default_mode`). Built-in operational-check registry; promote one into a guardrail with `invariance_guardrail_create`.
 
 **Cortex** (`cortex_*`)
-`cortex_run_job`, `cortex_run_eval`, `cortex_run_counterfactual` (kick off async Cortex jobs), `cortex_get_job`, `cortex_get_result` (poll status / fetch results).
+`cortex_ask`, `cortex_launch`, `cortex_list_jobs`, `cortex_retry_job`, `cortex_job_runs`, `cortex_run_job`, `cortex_run_eval`, `cortex_run_counterfactual`, `cortex_get_job`, `cortex_get_result` — ask governed, cited operational questions; create Cortex jobs; poll status/results; inspect attempt history.
 
 **Health**
 `invariance_doctor` — server + API + auth health check. Mirrors `inv doctor --json`. Use this first when an agent connects to verify its setup before issuing other calls.
@@ -205,7 +219,7 @@ Make sure you've set the `INVARIANCE_API_KEY` environment variable in your MCP c
 
 ### Authentication errors
 
-Verify your API key is valid at [app.useinvariance.com/settings/api-keys](https://app.useinvariance.com/settings/api-keys).
+Verify your API key is valid at [platform.useinvariance.com/settings/api-keys](https://platform.useinvariance.com/settings/api-keys).
 
 ### Connection timeouts
 
