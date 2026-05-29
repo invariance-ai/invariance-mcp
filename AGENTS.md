@@ -55,7 +55,7 @@ Call `invariance_doctor` first when you connect — it verifies server + API + a
 - `invariance_kb_*`, `invariance_narrative_get`, `invariance_ask` — KB pages/sessions and Q&A.
 - `invariance_agent_*`, `invariance_operator_*`, `invariance_session_*` — identity and capture sessions.
 - `cortex_*` — kick off / poll async Cortex jobs.
-- `invariance_eval_*` — datasets, scorers, suites, eval runs.
+- `invariance_eval_*` — datasets, scorers, suites, eval runs. Prefer `invariance_eval_dataset_seed_suite` to turn JSON examples into a dataset, suite, cases, and optional run in one call.
 
 ## Agent recipe: investigate a workflow's health
 

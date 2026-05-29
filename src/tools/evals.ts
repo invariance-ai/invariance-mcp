@@ -3,6 +3,78 @@ import { z } from 'zod';
 import type { InvarianceClient } from '../lib/client.js';
 import { jsonResult, parseJsonArg, registerReadTool, registerWriteTool } from '../lib/util.js';
 
+interface SeedSuiteRow {
+  name?: string;
+  input: Record<string, unknown>;
+  expected?: Record<string, unknown>;
+  assertions?: unknown[];
+  mutations?: unknown[];
+  metadata?: Record<string, unknown>;
+}
+
+interface SeedSuiteBody {
+  name: string;
+  suite_name?: string;
+  description?: string;
+  target_type?: string;
+  metadata?: Record<string, unknown>;
+  run?: boolean;
+  rows: SeedSuiteRow[];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function parseSeedSuiteBody(body: string): SeedSuiteBody {
+  const parsed = parseJsonArg('body', body);
+  if (!isRecord(parsed)) throw new Error('body must be a JSON object.');
+  if (typeof parsed.name !== 'string' || parsed.name.trim().length === 0) {
+    throw new Error('body.name is required.');
+  }
+  if (!Array.isArray(parsed.rows) || parsed.rows.length === 0) {
+    throw new Error('body.rows must be a non-empty array.');
+  }
+
+  const rows = parsed.rows.map((raw, i): SeedSuiteRow => {
+    if (!isRecord(raw)) throw new Error(`rows[${i}] must be an object.`);
+    if (!isRecord(raw.input)) throw new Error(`rows[${i}].input is required and must be an object.`);
+    if (raw.name !== undefined && typeof raw.name !== 'string') {
+      throw new Error(`rows[${i}].name must be a string.`);
+    }
+    if (raw.expected !== undefined && !isRecord(raw.expected)) {
+      throw new Error(`rows[${i}].expected must be an object.`);
+    }
+    if (raw.assertions !== undefined && !Array.isArray(raw.assertions)) {
+      throw new Error(`rows[${i}].assertions must be an array.`);
+    }
+    if (raw.mutations !== undefined && !Array.isArray(raw.mutations)) {
+      throw new Error(`rows[${i}].mutations must be an array.`);
+    }
+    if (raw.metadata !== undefined && !isRecord(raw.metadata)) {
+      throw new Error(`rows[${i}].metadata must be an object.`);
+    }
+    return {
+      name: raw.name,
+      input: raw.input,
+      expected: raw.expected,
+      assertions: raw.assertions,
+      mutations: raw.mutations,
+      metadata: raw.metadata,
+    };
+  });
+
+  return {
+    name: parsed.name,
+    suite_name: typeof parsed.suite_name === 'string' ? parsed.suite_name : undefined,
+    description: typeof parsed.description === 'string' ? parsed.description : undefined,
+    target_type: typeof parsed.target_type === 'string' ? parsed.target_type : undefined,
+    metadata: isRecord(parsed.metadata) ? parsed.metadata : undefined,
+    run: parsed.run === true,
+    rows,
+  };
+}
+
 export function registerEvalTools(server: McpServer, client: InvarianceClient): void {
   registerWriteTool(
     server,
@@ -87,6 +159,113 @@ export function registerEvalTools(server: McpServer, client: InvarianceClient): 
           limit,
         }),
       ),
+  );
+
+  registerWriteTool(
+    server,
+    'invariance_eval_dataset_seed_suite',
+    'One-call eval setup for agents: create a dataset, append rows, create a linked suite, create one case per row, and optionally start the eval run. This is the preferred MCP path for turning JSON examples into runnable evals.',
+    {
+      body: z.string().describe(
+        'JSON object. Required: name (dataset name), rows (non-empty array of {name?, input, expected?, assertions?, mutations?, metadata?}). Optional: suite_name, description, target_type (default "custom"), metadata, run (boolean). Example: {"name":"refund-regression","run":true,"rows":[{"name":"happy","input":{"prompt":"approve refund"},"expected":{"assertions":[{"path":"outcome","op":"equals","value":"approved"}]}}]}',
+      ),
+    },
+    async ({ body }) => {
+      const spec = parseSeedSuiteBody(body);
+      if (spec.suite_name === undefined || spec.suite_name === spec.name) {
+        const res = await client.post<{
+          dataset: { id: string } & Record<string, unknown>;
+          suite: { id: string } & Record<string, unknown>;
+          cases?: unknown[];
+          [key: string]: unknown;
+        }>('/v1/eval-datasets/seed-suite', {
+          name: spec.name,
+          description: spec.description,
+          target_type: spec.target_type ?? 'custom',
+          dataset_metadata: spec.metadata,
+          suite_metadata: spec.metadata,
+          rows: spec.rows.map((row, i) => ({
+            name: row.name ?? `case-${String(i + 1).padStart(3, '0')}`,
+            input: row.input,
+            expected: row.expected,
+            assertions: row.assertions,
+            mutations: row.mutations,
+            metadata: row.metadata,
+          })),
+          run: spec.run === true,
+        });
+        return jsonResult({
+          ...res,
+          id: res.suite.id,
+          dataset_id: res.dataset.id,
+          suite_id: res.suite.id,
+          case_count: res.cases?.length ?? 0,
+        });
+      }
+      const datasetRes = await client.post<{ dataset: { id: string } & Record<string, unknown> }>(
+        '/v1/eval-datasets',
+        {
+          name: spec.name,
+          description: spec.description,
+          metadata: spec.metadata,
+        },
+      );
+      const suiteRes = await client.post<{ suite: { id: string } & Record<string, unknown> }>(
+        '/v1/eval-suites',
+        {
+          name: spec.suite_name ?? spec.name,
+          description: spec.description,
+          target_type: spec.target_type ?? 'custom',
+          dataset_id: datasetRes.dataset.id,
+          metadata: spec.metadata,
+        },
+      );
+      const examples: unknown[] = [];
+      const cases: unknown[] = [];
+      for (const [i, row] of spec.rows.entries()) {
+        const exampleRes = await client.post<{ example: { id: string } & Record<string, unknown> }>(
+          `/v1/eval-datasets/${encodeURIComponent(datasetRes.dataset.id)}/examples`,
+          {
+            input: row.input,
+            expected: row.expected,
+            metadata: row.metadata,
+          },
+        );
+        examples.push(exampleRes.example);
+        const caseRes = await client.post<{ case: unknown }>(
+          `/v1/eval-suites/${encodeURIComponent(suiteRes.suite.id)}/cases`,
+          {
+            name: row.name ?? `case-${String(i + 1).padStart(3, '0')}`,
+            dataset_example_id: exampleRes.example.id,
+            input_bundle: row.input,
+            expected: row.expected,
+            assertions: row.assertions,
+            mutations: row.mutations,
+            metadata: row.metadata,
+          },
+        );
+        cases.push(caseRes.case);
+      }
+      const evalRun = spec.run
+        ? (
+            await client.post<{ eval_run: unknown }>(
+              `/v1/eval-suites/${encodeURIComponent(suiteRes.suite.id)}/run`,
+              {},
+            )
+          ).eval_run
+        : undefined;
+      return jsonResult({
+        dataset: datasetRes.dataset,
+        suite: suiteRes.suite,
+        examples,
+        cases,
+        ...(evalRun ? { eval_run: evalRun } : {}),
+        id: suiteRes.suite.id,
+        dataset_id: datasetRes.dataset.id,
+        suite_id: suiteRes.suite.id,
+        case_count: cases.length,
+      });
+    },
   );
 
   registerWriteTool(
